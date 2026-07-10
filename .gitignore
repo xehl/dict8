@@ -1,0 +1,23 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+
+# Temporary recordings and generated content
+*.m4a
+*.wav
+*.aac
+
