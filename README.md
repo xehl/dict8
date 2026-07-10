@@ -6,9 +6,9 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-This repository is at the planning and skeleton stage. It intentionally contains no application implementation or Xcode project yet.
+This repository is at the planning and skeleton stage. It intentionally contains no application implementation or Xcode project yet. Development begins with Phase 0 in `PRD.md`.
 
-- Product requirements and phased delivery plan: [PRD.md](PRD.md)
+- Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
 
 ## Planned source layout

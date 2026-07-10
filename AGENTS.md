@@ -2,15 +2,17 @@
 
 These instructions apply to all Codex work in this repository.
 
+`PRD.md` is the source of truth for product behavior, scope, approved exceptions, and phase numbering. If this file conflicts with `PRD.md`, stop and reconcile this file to `PRD.md` before implementation; do not override the PRD.
+
 ## 1. Operating mode
 
 Work incrementally.
 
-Implement only the explicitly requested milestone or task. Do not skip ahead, pre-build future features, or add speculative abstractions.
+Implement only the explicitly requested phase or task. Do not skip ahead, pre-build future features, or add speculative abstractions.
 
 Before making changes:
 
-1. Read `SPEC.md`.
+1. Read `PRD.md`, the authoritative product and phase specification.
 2. Read this file.
 3. Inspect the repository structure.
 4. Inspect relevant existing files.
@@ -58,7 +60,7 @@ Only implement the requested task.
 
 Do not add:
 
-* Future milestones
+* Future phases
 * Unrequested settings
 * Extra AI providers
 * Generic plugin systems
@@ -66,10 +68,10 @@ Do not add:
 * Complex dependency injection frameworks
 * Extra UI polish
 * Logging frameworks
-* Analytics beyond the requested milestone
+* Analytics beyond the requested phase
 * Persistence beyond current requirements
 * Compatibility code for hypothetical platforms
-* Refactors unrelated to the milestone
+* Refactors unrelated to the phase
 
 If a future requirement affects current design, create only the smallest seam necessary.
 
@@ -82,12 +84,13 @@ dict8 is a personal native macOS push-to-talk dictation app.
 Core v0 behavior:
 
 ```text
-hold Control + Space
+hold Control + Option
 → record
 → release
 → transcribe
 → clean
-→ paste
+→ verify the original target
+→ paste or copy and notify
 → delete temporary data
 ```
 
@@ -110,7 +113,7 @@ v0 excludes:
 
 * Streaming transcription
 * Live partial transcripts
-* Transcript history
+* Transcript history beyond the approved ten-minute, memory-only Paste Last Dictation cache
 * Audio history
 * Preview-before-paste
 * Retry/rewrite UX
@@ -120,10 +123,24 @@ v0 excludes:
 * Local Whisper
 * Multiple AI-provider implementations
 * Automatic model routing
-* Model fallback routing
-* Floating overlay
+* More than one explicit fallback model per pipeline stage
+* Interactive or persistent floating overlay beyond the approved recording HUD
 * App Store distribution
 * Notarization
+* Intel Mac and older macOS compatibility
+
+Approved v0 additions:
+
+* `Control + Option` is the fixed push-to-talk chord and is consumed while enabled.
+* `Command + Control + V` re-pastes one memory-only result cached for at most ten minutes.
+* The cache clears on expiry, replacement, Disable, Quit, or screen lock.
+* Automatic paste occurs only if the originating application remains foreground; otherwise copy and notify.
+* Known password and secure fields are refused.
+* Keychain stores the normal-launch API key; `OPENROUTER_API_KEY` is a development override.
+* Every OpenRouter attempt enforces Zero Data Retention.
+* Each AI stage has one pinned model and at most one explicit fallback.
+* A subtle start/stop cue and non-activating bottom-center microphone HUD provide recording feedback.
+* Normal launch and Launch at Login are included.
 
 ## 5. Architecture rules
 
@@ -291,13 +308,13 @@ Temporary audio must be deleted on:
 * Cancellation where practical
 * App shutdown where practical
 
-Transcript strings should remain in local function scope and become unreferenced after use.
+Transcript strings should remain in the narrowest practical scope and become unreferenced after use, except for the approved Paste Last Dictation cache. That cache may hold only the last successful output in process memory for at most ten minutes and must never be logged, persisted, or synchronized.
 
 Errors shown to the user must not include transcript or audio contents.
 
 ## 11. API keys
 
-For initial local development, use:
+For normal launches, store the API key in macOS Keychain. For local development, allow this process-environment override:
 
 ```text
 OPENROUTER_API_KEY
@@ -305,7 +322,7 @@ OPENROUTER_API_KEY
 
 Rules:
 
-* Read it from the process environment.
+* Prefer the process environment only as an explicit development override; otherwise read from Keychain.
 * Never print it.
 * Never display it.
 * Never commit it.
@@ -313,7 +330,7 @@ Rules:
 * Never include it in test fixtures.
 * Only display configured or missing status.
 * Add relevant local secret files to `.gitignore`.
-* Do not introduce Keychain storage until explicitly requested.
+* Do not introduce custom Keychain access groups or synchronization without explicit approval.
 
 ## 12. OpenRouter integration
 
@@ -343,16 +360,16 @@ Do not invent:
 
 Keep model identifiers in one configuration location.
 
-Pin explicit models for v0.
+Pin explicit primary and fallback models for v0.
 
 Do not use:
 
 * Automatic model routing
 * Provider fallback routing
-* Multiple cleanup models
-* Multiple STT models
+* More than one explicit cleanup fallback
+* More than one explicit STT fallback
 
-unless explicitly requested.
+The single explicit fallback per stage is approved. It must be configured centrally, ZDR-compatible, and attempted only for the eligible failure classes defined in `PRD.md`.
 
 Use one shared OpenRouter client for:
 
@@ -454,7 +471,7 @@ Requirements:
 Default shortcut:
 
 ```text
-Control + Space
+Control + Option
 ```
 
 Requirements:
@@ -469,6 +486,7 @@ Requirements:
 * Document permission requirements.
 * Document macOS limitations.
 * Ignore the shortcut while dict8 is processing.
+* Consume the chord while dict8 is enabled so it does not affect the foreground application.
 
 Do not:
 
@@ -562,9 +580,9 @@ Never swallow errors silently.
 
 ## 20. Retry behavior
 
-Retry at most once unless explicitly changed later.
+Allow at most two model attempts per AI stage: the pinned model and one configured fallback. Do not combine a same-model retry with fallback in a way that exceeds this total attempt cap.
 
-Retry only transient failures:
+Use the fallback only for eligible availability or transient failures:
 
 * Network interruption
 * HTTP 429
@@ -573,7 +591,7 @@ Retry only transient failures:
 * HTTP 503
 * HTTP 504
 
-Use short exponential backoff with jitter.
+Use short exponential backoff with jitter when a backoff is needed. Respect a reasonable `Retry-After` value without exceeding the stage deadline.
 
 Do not retry:
 
@@ -587,7 +605,7 @@ Do not retry:
 * Local recording-state errors
 * Paste failures
 
-Keep retry behavior inside the shared API client.
+Keep attempt and fallback behavior in the shared API client or one shared request-execution layer.
 
 Do not duplicate retry logic across providers.
 
@@ -620,7 +638,7 @@ Forbidden:
 
 Missing cost metadata must not fail the request.
 
-Use simple persistence such as `UserDefaults` only when the metrics milestone is requested.
+Use simple persistence such as `UserDefaults` only when the metrics phase is requested.
 
 ## 22. Testing
 
@@ -706,8 +724,8 @@ If unexpected modified, staged, or untracked files exist:
 
 During implementation:
 
-* Keep changes limited to the requested milestone.
-* Do not mix unrelated refactors into the milestone.
+* Keep changes limited to the requested phase.
+* Do not mix unrelated refactors into the phase.
 * Do not reformat unrelated files.
 * Do not alter generated Xcode project files unnecessarily.
 * Do not fix unrelated bugs unless requested.
@@ -738,11 +756,11 @@ Do not:
 * Commit DerivedData
 * Commit local environment files
 
-## 25. Milestone commit policy
+## 25. Phase commit policy
 
-Create one commit after each completed milestone.
+Create one commit after each completed phase.
 
-A milestone may be committed only when:
+A phase may be committed only when:
 
 * Requested scope is complete.
 * The project builds, or the environment limitation is explicitly documented.
@@ -751,11 +769,11 @@ A milestone may be committed only when:
 * No secrets are included.
 * No unrelated changes are included.
 
-Do not combine multiple milestones into one commit.
+Do not combine multiple phases into one commit.
 
 Do not create WIP commits unless explicitly requested.
 
-Do not make multiple commits for one milestone unless necessary to preserve user work or explicitly requested.
+Do not make multiple commits for one phase unless necessary to preserve user work or explicitly requested.
 
 Commit message format:
 
@@ -811,7 +829,7 @@ git diff --stat
 git diff
 ```
 
-Then stage only milestone-related files.
+Then stage only phase-related files.
 
 Prefer explicit staging:
 
@@ -826,7 +844,7 @@ git add .
 git add -A
 ```
 
-unless every changed file has been reviewed and belongs to the milestone.
+unless every changed file has been reviewed and belongs to the phase.
 
 After committing, run:
 
@@ -844,7 +862,7 @@ Report:
 * Build result
 * Test result
 
-If the milestone should not be committed, explain exactly why.
+If the phase should not be committed, explain exactly why.
 
 ## 26. GitHub remote policy
 
@@ -871,7 +889,7 @@ gh repo rename
 
 Do not:
 
-* Push automatically after a milestone.
+* Push automatically after a phase.
 * Open pull requests automatically.
 * Modify branch protection.
 * Change repository visibility.
@@ -943,7 +961,7 @@ If proposing a dependency, stop before adding it and report:
 
 ## 30. Documentation
 
-Keep `SPEC.md` authoritative for product behavior.
+Keep `PRD.md` authoritative for product behavior, scope, and phase numbering.
 
 Update documentation when behavior or setup changes.
 
@@ -960,7 +978,7 @@ Document:
 
 Do not let README instructions drift from actual behavior.
 
-Do not duplicate large sections of `SPEC.md` into README.
+Do not duplicate large sections of `PRD.md` into README.
 
 ## 31. Xcode project discipline
 
@@ -988,7 +1006,7 @@ If project-file changes are necessary:
 
 ## 32. Manual verification
 
-Each milestone must include exact manual verification steps.
+Each phase must include exact manual verification steps.
 
 Steps should specify:
 
@@ -1071,9 +1089,9 @@ If no commit was created, explain why.
 
 List only real current limitations.
 
-### Next milestone
+### Next phase
 
-Name the next milestone.
+Name the next numbered phase.
 
 Do not implement it.
 
@@ -1081,13 +1099,13 @@ Do not implement it.
 
 Stop and report rather than improvising when:
 
-* Official API documentation contradicts `SPEC.md`.
+* Official API documentation contradicts `PRD.md`.
 * A model identifier cannot be verified.
 * Required macOS behavior is impossible with the chosen API.
 * A permission requirement changes product behavior.
 * The repository is conflicted.
 * The working tree contains unexpected user changes that overlap with the task.
-* Existing architecture materially conflicts with the requested milestone.
+* Existing architecture materially conflicts with the requested phase.
 * A requested action risks deleting user work.
 * A secret appears committed.
 * A third-party dependency appears necessary.
@@ -1099,11 +1117,11 @@ Do not conceal uncertainty.
 
 Do not invent a workaround and present it as verified.
 
-## 35. Default milestone procedure
+## 35. Default phase procedure
 
-For every milestone:
+For every phase, beginning with Phase 0 and preserving the Phase 0–9 numbering in `PRD.md`:
 
-1. Read `SPEC.md`.
+1. Read `PRD.md`.
 2. Read `AGENTS.md`.
 3. Inspect the repository.
 4. Run `git status`.
@@ -1121,8 +1139,8 @@ For every milestone:
 16. Run `git diff --stat`.
 17. Run `git diff`.
 18. Verify no secrets or unrelated changes are present.
-19. Stage only milestone files.
-20. Commit the milestone.
+19. Stage only phase files.
+20. Commit the phase.
 21. Run `git status`.
 22. Run `git log -1 --stat --oneline`.
 23. Report using the required format.
@@ -1132,7 +1150,7 @@ For every milestone:
 
 When first asked to work in this repository:
 
-1. Read `SPEC.md`.
+1. Read `PRD.md`.
 2. Read `AGENTS.md`.
 3. Inspect the repository.
 4. Show the current directory tree.
@@ -1140,6 +1158,6 @@ When first asked to work in this repository:
 6. Summarize the product in five bullets.
 7. Summarize the engineering constraints in ten bullets.
 8. Identify contradictions, missing setup, or ambiguity.
-9. Propose the smallest plan for Milestone 1.
+9. Propose the smallest plan for Phase 0.
 10. List the exact files expected to change.
 11. Stop before implementation unless the user explicitly requested implementation in the same message.

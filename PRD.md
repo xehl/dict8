@@ -38,8 +38,8 @@ The core journey is:
 3. Speak.
 4. Release the shortcut.
 5. See status progress through transcription, cleanup, and paste.
-6. Receive readable plain text in the focused field.
-7. Leave no temporary audio or transcript data behind.
+6. Receive readable plain text in the originating field, or a copied result with a notification if focus changed.
+7. Leave no temporary audio or transcript data behind except the approved ten-minute memory-only last-dictation cache.
 
 v0 is successful when this journey works reliably in TextEdit and the primary assistant/coding targets, feels suitable for routine use, and fails without destroying clipboard contents or leaking user content.
 
@@ -50,7 +50,7 @@ v0 is successful when this journey works reliably in TextEdit and the primary as
 - Short dictations generally paste within 2–5 seconds after release
 - 60–120 second dictations generally paste within 5–10 seconds after release
 - No UI blocking during recording or processing
-- No audio or transcript content retained after a terminal outcome
+- No audio or transcript content retained after a terminal outcome except the approved memory-only last-dictation cache
 - Cleanup output preserves meaning and the user’s level of formality
 
 Latency targets are directional because network and model latency vary; they are not hard automated test thresholds.
@@ -268,9 +268,9 @@ Each stage makes at most two model attempts total: the pinned model and one conf
 
 Model identifiers live in one configuration type. They must be verified against current OpenRouter documentation at implementation time; this document intentionally does not invent model slugs.
 
-## 9. Phased build plan
+## 9. Numbered phase plan
 
-Each phase is independently demonstrable. Work does not advance until its exit criteria pass.
+Development starts at Phase 0 because no application implementation exists yet. Each phase is independently demonstrable, maps one-to-one to a commit when complete, and must pass its exit criteria before work advances.
 
 ### Phase 0 — Decisions and repository foundation
 
@@ -377,7 +377,7 @@ Each phase is independently demonstrable. Work does not advance until its exit c
 **Deliverables:**
 
 - Shared `OpenRouterClient`
-- Environment authentication
+- Keychain authentication with `OPENROUTER_API_KEY` as a development override
 - Request timing, status validation, sanitized error decoding, and cancellation
 - ZDR enforcement and explicit two-attempt fallback policy
 - Mockable URL transport
