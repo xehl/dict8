@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Approved for Phase 0 validation  
+**Status:** Phase 0 complete; approved for Phase 1
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -256,7 +256,8 @@ The coordinator owns this pipeline and depends on protocols for recording, trans
 - Swift and SwiftUI for the application and UI
 - AppKit where macOS integration requires it
 - AVFoundation for recording
-- Native event monitoring or Carbon-based handling for the global shortcut
+- An active `CGEvent` tap for consumed global modifier press-and-release handling
+- Hardened Runtime with App Sandbox disabled; Phase 0 testing showed the sandbox prevented Accessibility authorization required by the event tap and focused-element inspection
 - `NSPasteboard` and `CGEvent` for paste
 - `URLSession` and Swift concurrency for networking
 - Keychain Services for normal-launch API-key storage
@@ -267,6 +268,8 @@ The coordinator owns this pipeline and depends on protocols for recording, trans
 Each stage makes at most two model attempts total: the pinned model and one configured fallback. Fallback is eligible for model/provider unavailability, timeouts, rate limits, and transient server or network failures. Authentication, insufficient credits, invalid requests, unsupported media, oversized payloads, decoding errors, secure-field refusal, and invalid successful output do not trigger model fallback. Respect a reasonable `Retry-After` value without exceeding the stage deadline.
 
 Model identifiers live in one configuration type. They must be verified against current OpenRouter documentation at implementation time; this document intentionally does not invent model slugs.
+
+The Phase 0 live benchmark successfully sent exact 15-, 120-, and 180-second synthetic `.m4a` files as single ZDR requests to the pinned STT model. All returned HTTP 200 in under two seconds, and the 180-second upload remained under 1 MB. v0 therefore begins without chunking. The repeated synthetic phrase produced compressed long-form output, so representative non-repetitive prose remains a required compatibility check before v0 readiness.
 
 ## 9. Numbered phase plan
 
@@ -280,7 +283,7 @@ Development starts at Phase 0 because no application implementation exists yet. 
 
 - Create the macOS repository and Xcode project
 - Confirm deployment target, bundle identifier, signing approach, and test targets
-- Use a stable signed bundle identity and intended sandbox entitlements from the first permission test
+- Use a stable signed bundle identity and validate the intended security configuration from the first permission test
 - Preserve the service-oriented folder structure in this repository
 - Prototype and document the hotkey mechanism needed for both press and release events
 - Prototype consumed `Control + Option` input in TextEdit and a browser, including local and global app focus
@@ -509,6 +512,7 @@ Live OpenRouter tests are manual and opt-in because they use credentials and API
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Global shortcut APIs do not reliably expose hold/release semantics | Core interaction fails or needs invasive event monitoring | Prototype in Phase 0; document Accessibility needs and choose based on observed behavior |
+| App Sandbox prevents required Accessibility behavior | Hotkey and target inspection cannot operate | Distribute the personal v0 outside the Mac App Store, keep Hardened Runtime enabled, and leave App Sandbox disabled |
 | OpenRouter schemas or supported model IDs change | Integration or cost assumptions break | Verify official documentation at implementation time; isolate contracts and model IDs in configuration |
 | Synthetic paste varies by target app or permission state | Text lands only on clipboard | Prove TextEdit slice early, retain copied text on failure, maintain a compatibility matrix |
 | Long recordings create large request bodies and latency | Slow or rejected requests | Use compressed mono audio, 180-second cap, endpoint payload validation, and long-form manual tests |
@@ -522,15 +526,9 @@ Live OpenRouter tests are manual and opt-in because they use credentials and API
 
 ## 12. Open decisions
 
-Resolve these in Phase 0 rather than guessing during implementation:
+Phase 0 resolved the hotkey mechanism, model candidates, endpoint contracts, signing workflow, macOS security configuration, and initial no-chunking strategy. The active `CGEvent` tap and focused-element probe worked in TextEdit and a browser only after App Sandbox was disabled; Accessibility permission remains required. The following decision remains open for its implementation phase:
 
-1. Which native hotkey/event mechanism most reliably supports consumed press-and-release semantics for `Control + Option`?
-2. Which currently supported, ZDR-compatible OpenRouter model IDs will be pinned and used as one fallback for STT and cleanup?
-3. What are the exact current OpenRouter transcription request, response, usage, cost, and ZDR-routing fields?
-4. Does 180-second audio work reliably with the chosen STT route, or is transparent chunking required?
-5. What Accessibility and sandbox behavior is observed for hotkey capture, target verification, secure-field detection, and paste on macOS 26.5?
-6. How should an automatic 180-second stop communicate that the user may release the still-held shortcut without starting another action?
-7. What stable local signing workflow best preserves microphone and Accessibility permissions across builds?
+1. How should an automatic 180-second stop communicate that the user may release the still-held shortcut without starting another action?
 
 ## 13. Definition of done for v0
 

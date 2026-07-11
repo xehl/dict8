@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-07-11T21:41:58Z",
+  "synthetic_audio_only": true,
+  "per_request_zdr": true,
+  "all_requests_succeeded": true,
+  "results": [
+    {
+      "success": true,
+      "http_status": 200,
+      "latency_seconds": 1.049,
+      "upload_bytes": 86464,
+      "download_bytes": 349,
+      "transcript_character_count": 284,
+      "error_category": null,
+      "fallback_eligible": false,
+      "usage": {
+        "cost": 0.0003760921875,
+        "seconds": 15.0436875
+      },
+      "requested_duration_seconds": 15,
+      "measured_duration_seconds": 15.000000,
+      "model": "openai/whisper-large-v3",
+      "attempt": "primary"
+    },
+    {
+      "success": true,
+      "http_status": 200,
+      "latency_seconds": 1.927,
+      "upload_bytes": 666048,
+      "download_bytes": 76,
+      "transcript_character_count": 10,
+      "error_category": null,
+      "fallback_eligible": false,
+      "usage": {
+        "cost": 0.0030011078125,
+        "seconds": 120.0443125
+      },
+      "requested_duration_seconds": 120,
+      "measured_duration_seconds": 120.000000,
+      "model": "openai/whisper-large-v3",
+      "attempt": "primary"
+    },
+    {
+      "success": true,
+      "http_status": 200,
+      "latency_seconds": 1.88,
+      "upload_bytes": 998540,
+      "download_bytes": 124,
+      "transcript_character_count": 60,
+      "error_category": null,
+      "fallback_eligible": false,
+      "usage": {
+        "cost": 0.004501115625,
+        "seconds": 180.044625
+      },
+      "requested_duration_seconds": 180,
+      "measured_duration_seconds": 180.000000,
+      "model": "openai/whisper-large-v3",
+      "attempt": "primary"
+    }
+  ]
+}

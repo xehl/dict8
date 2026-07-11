@@ -4,24 +4,21 @@ This file records implementation decisions that must be verified rather than ass
 
 ## ADR-001 — Global push-to-talk mechanism
 
-**Status:** Open  
-**Decision needed by:** Phase 0
+**Status:** Phase 0 prototype validated
 
-Evaluate native approaches for consumed global `Control + Option` press-and-release semantics. Record reliability, modifier-event ordering, key-repeat behavior, Accessibility requirements, lifecycle cleanup, and behavior while dict8 or another app is focused. Keep the service abstract so a future configurable shortcut or chord-emitting external button does not affect orchestration.
+Phase 0 uses an active `CGEvent` tap over modifier events because it exposes separate transitions and can suppress delivery. On 2026-07-10, the owner reported successful press/release and target capture checks in TextEdit and a browser. Consuming a modifier-only chord can disable ordinary Control/Option shortcuts while active; that tradeoff is accepted for personal v0 but remains a reason to keep the eventual service abstract for a future configurable shortcut or chord-emitting external button.
 
 ## ADR-002 — macOS deployment and signing
 
-**Status:** Partially accepted  
-**Decision needed by:** Phase 0
+**Status:** Accepted for personal v0 development
 
-v0 targets the user's current macOS 26.5 Apple-silicon system only and is for personal use. Use a stable signed bundle identity, normal Finder launch, and Launch at Login. The exact bundle identifier, development team/signing workflow, and sandbox configuration remain to be selected in Phase 0.
+v0 is developed and tested on macOS 26.5 for Apple silicon with a macOS 26.0 deployment target. The bundle identifier is `com.xehl.dict8`. Use Xcode automatic signing with Personal Team `94685W8N78` and Hardened Runtime. App Sandbox must remain disabled: in the observed Phase 0 test, sandboxing prevented dict8 from appearing in Accessibility settings and the event tap could not run; removing it allowed authorization and the probe to work. Developer ID distribution, notarization, and Mac App Store distribution remain out of scope.
 
 ## ADR-003 — OpenRouter contracts and pinned models
 
-**Status:** Open  
-**Decision needed by:** Phase 0
+**Status:** Contracts and candidates verified; STT live route verified, cleanup live behavior pending
 
-Verify the current official transcription and text endpoint schemas. Record links, request/response shapes, supported audio constraints, retry-relevant status behavior, and exact pinned and fallback model identifiers. Both attempts must enforce ZDR. Each stage permits at most two total model attempts. Do not invent model slugs.
+The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fallback for STT, and `google/gemini-2.5-flash-lite` with `anthropic/claude-haiku-4.5` fallback for cleanup. They appeared in the relevant public Models API queries with ZDR filtering on 2026-07-10. Both attempts must enforce per-request ZDR, and each stage permits at most two total model attempts. Re-verify before Phase 4–6 and validate quality/latency through explicit manual tests.
 
 ## ADR-004 — Temporary-file lifecycle
 
@@ -38,9 +35,9 @@ Write plain text to the clipboard only after transcription succeeds, then synthe
 
 ## ADR-006 — Original target and secure fields
 
-**Status:** Accepted, pending Phase 0 validation
+**Status:** Phase 0 prototype validated
 
-Capture the originating foreground application when recording begins. Automatically paste only if that application remains foreground; otherwise copy and notify. Refuse operation for a focused element known to be a password or secure field. Validate the reliability and permission requirements of target and secure-field detection on macOS 26.5 before production implementation.
+Capture the originating foreground application when recording begins. Automatically paste only if that application remains foreground; otherwise copy and notify. Refuse operation for a focused element known to be a password or secure field. On 2026-07-10, the owner reported successful originating-target retention and secure-field identification in the Phase 0 probe with Accessibility granted and App Sandbox disabled.
 
 ## ADR-007 — Last-dictation cache
 
@@ -62,9 +59,9 @@ Play an unobtrusive cue before recording starts and after recording stops so cue
 
 ## ADR-010 — Long recording strategy
 
-**Status:** Open, decision by Phase 0 benchmark
+**Status:** Accepted for initial v0 implementation
 
-Benchmark the selected STT route with 15-, 120-, and 180-second `.m4a` recordings. If long requests are unreliable, transparently split audio and merge ordered transcripts while preserving the single hold-and-release interaction.
+Begin with one STT request per recording and no chunking. On 2026-07-11, exact 15-, 120-, and 180-second synthetic `.m4a` files all succeeded through the primary ZDR route with HTTP 200; measured request latency was 1.049–1.927 seconds, and the 180-second upload was 998,540 bytes. The repeated synthetic phrase caused compressed long-form output, so this validates transport, payload size, and timing rather than representative fidelity. Re-test non-repetitive long prose before v0 readiness and add transparent ordered chunking if real-prose fidelity or reliability fails.
 
 ## ADR-011 — Cleanup output safety
 
