@@ -24,6 +24,29 @@ struct SettingsView: View {
 
             Section("Permissions") {
                 LabeledContent(
+                    "Microphone",
+                    value: appState.microphonePermissionStatus.displayName
+                )
+
+                HStack {
+                    Button("Request Microphone") {
+                        coordinator.requestMicrophonePermission()
+                    }
+                    .disabled(
+                        appState.microphonePermissionStatus == .granted
+                            || appState.microphonePermissionStatus == .restricted
+                    )
+
+                    Button("Open Microphone Settings") {
+                        coordinator.openMicrophoneSettings()
+                    }
+
+                    Button("Refresh Microphone") {
+                        coordinator.refreshMicrophonePermission()
+                    }
+                }
+
+                LabeledContent(
                     "Accessibility",
                     value: appState.accessibilityStatus.displayName
                 )
@@ -38,12 +61,54 @@ struct SettingsView: View {
                         coordinator.openAccessibilitySettings()
                     }
 
-                    Button("Refresh") {
+                    Button("Refresh Accessibility") {
                         coordinator.refreshAccessibilityPermission()
                     }
                 }
 
                 Text("Accessibility lets dict8 inspect the focused target and synthesize paste without reading field contents.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Audio recording test") {
+                LabeledContent("Status", value: appState.audioTestStatus.displayName)
+
+                if appState.audioTestStatus.isStartingOrRecording {
+                    HStack {
+                        Button("Stop Test Recording") {
+                            coordinator.stopTestRecording()
+                        }
+                        .disabled(appState.audioTestStatus == .starting)
+
+                        Button("Cancel and Delete", role: .destructive) {
+                            coordinator.cancelTestRecording()
+                        }
+                    }
+                } else if appState.audioTestStatus.hasRecordingReady {
+                    HStack {
+                        Button("Play and Delete") {
+                            coordinator.playAndDeleteTestRecording()
+                        }
+
+                        Button("Delete Without Playing", role: .destructive) {
+                            coordinator.deleteTestRecording()
+                        }
+                    }
+                } else if appState.audioTestStatus == .playing {
+                    Button("Stop Playback and Delete", role: .destructive) {
+                        coordinator.cancelTestRecording()
+                    }
+                } else {
+                    Button("Start Test Recording") {
+                        coordinator.startTestRecording()
+                    }
+                    .disabled(
+                        !appState.isEnabled
+                            || appState.microphonePermissionStatus != .granted
+                    )
+                }
+
+                Text("Records mono AAC to an app-owned temporary .m4a file. A stopped test is deleted after playback, on Delete, after ten minutes, or on lifecycle cleanup.")
                     .foregroundStyle(.secondary)
             }
 
@@ -137,7 +202,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 620, height: 760)
+        .frame(width: 680, height: 920)
         .onAppear {
             coordinator.refreshConfiguration()
         }

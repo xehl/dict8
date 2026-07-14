@@ -5,12 +5,14 @@ enum TransientFeedback: Equatable, Sendable {
     case copiedBecauseFocusChanged
     case pasteLastUnavailable
     case pasteLastSucceeded
+    case recordingLimitReached
 
     var symbolName: String {
         switch self {
         case .copiedBecauseFocusChanged: "doc.on.clipboard"
         case .pasteLastUnavailable: "clock.badge.exclamationmark"
         case .pasteLastSucceeded: "checkmark.circle"
+        case .recordingLimitReached: "timer"
         }
     }
 
@@ -19,6 +21,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .copiedBecauseFocusChanged: "Copied — focus changed"
         case .pasteLastUnavailable: "No recent dictation"
         case .pasteLastSucceeded: "Pasted last dictation"
+        case .recordingLimitReached: "3-minute limit reached — recording stopped"
         }
     }
 }
@@ -26,6 +29,7 @@ enum TransientFeedback: Equatable, Sendable {
 @MainActor
 protocol RecordingHUDPresenting: AnyObject {
     func showPreview(for duration: Duration)
+    func showRecording()
     func showFeedback(_ feedback: TransientFeedback)
     func hide()
 }
@@ -67,6 +71,15 @@ final class RecordingHUDController: RecordingHUDPresenting {
         )
     }
 
+    func showRecording() {
+        present(
+            symbolName: "mic.fill",
+            message: nil,
+            width: 72,
+            duration: nil
+        )
+    }
+
     func showFeedback(_ feedback: TransientFeedback) {
         present(
             symbolName: feedback.symbolName,
@@ -86,7 +99,7 @@ final class RecordingHUDController: RecordingHUDPresenting {
         symbolName: String,
         message: String?,
         width: CGFloat,
-        duration: Duration
+        duration: Duration?
     ) {
         presentationTask?.cancel()
         panel.setContentSize(NSSize(width: width, height: 48))
@@ -96,6 +109,7 @@ final class RecordingHUDController: RecordingHUDPresenting {
         positionOnActiveScreen()
         panel.orderFrontRegardless()
 
+        guard let duration else { return }
         presentationTask = Task { [weak self] in
             do {
                 try await Task.sleep(for: duration)

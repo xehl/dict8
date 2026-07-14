@@ -34,6 +34,9 @@ final class PhaseOneAppShellTests: XCTestCase {
             apiKeyStore: FakeAPIKeyStore(),
             launchAtLoginService: FakeLaunchAtLoginService(),
             accessibility: FakeAccessibilityService(),
+            microphonePermission: FakeMicrophonePermissionService(),
+            audioRecorder: FakeAudioRecorder(),
+            audioPlayback: FakeAudioPlayback(),
             pasteService: FakeTextPasteService(),
             lastDictationCache: FakeLastDictationCache(),
             pasteLastMonitor: FakePasteLastHotkeyMonitor(),
@@ -92,9 +95,18 @@ final class PhaseOneAppShellTests: XCTestCase {
             .pasteEventCreationFailed,
             .pasteFailed,
             .pasteLastMonitorFailed,
+            .microphonePermissionRequired,
+            .microphonePermissionRestricted,
+            .microphoneSettingsUnavailable,
+            .recordingAlreadyActive,
+            .noActiveRecording,
+            .recordingStartFailed,
+            .recordingEncodingFailed,
+            .temporaryAudioCleanupFailed,
+            .audioPlaybackFailed,
         ].compactMap(\.errorDescription)
 
-        XCTAssertEqual(messages.count, 13)
+        XCTAssertEqual(messages.count, 22)
         XCTAssertTrue(messages.allSatisfy { !$0.contains("development-override") })
     }
 }
@@ -162,7 +174,35 @@ private final class FakeRecordingHUD: RecordingHUDPresenting {
         previewDurations.append(duration)
     }
 
+    func showRecording() {}
     func showFeedback(_ feedback: TransientFeedback) {}
 
     func hide() {}
+}
+
+@MainActor
+private final class FakeMicrophonePermissionService: MicrophonePermissionControlling {
+    var status: MicrophonePermissionStatus = .granted
+    func requestPermission() async -> MicrophonePermissionStatus { status }
+    func openSystemSettings() -> Bool { true }
+}
+
+@MainActor
+private final class FakeAudioRecorder: AudioRecording {
+    var isRecording = false
+    var elapsedTime: TimeInterval = 0
+    var onMaximumDurationReached: ((Result<RecordedAudioFile, AudioRecordingError>) -> Void)?
+
+    func start() throws { isRecording = true }
+    func stop() throws -> RecordedAudioFile { throw AudioRecordingError.noActiveRecording }
+    func cancel() throws { isRecording = false }
+    func delete(_ recording: RecordedAudioFile) throws {}
+}
+
+@MainActor
+private final class FakeAudioPlayback: AudioPlaybackProviding {
+    func playStartCue() async throws {}
+    func playStopCue() async throws {}
+    func playPreview(at url: URL) async throws {}
+    func stop() {}
 }

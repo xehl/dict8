@@ -91,6 +91,41 @@ enum TestPasteStatus: Equatable, Sendable {
     }
 }
 
+enum AudioTestStatus: Equatable, Sendable {
+    case idle
+    case starting
+    case recording(elapsedSeconds: Int)
+    case ready(durationSeconds: Int)
+    case playing
+
+    var displayName: String {
+        switch self {
+        case .idle: "Ready"
+        case .starting: "Starting"
+        case let .recording(elapsedSeconds):
+            "Recording \(Self.time(elapsedSeconds))"
+        case let .ready(durationSeconds):
+            "Recorded \(Self.time(durationSeconds)) — temporary"
+        case .playing: "Playing, then deleting"
+        }
+    }
+
+    var isStartingOrRecording: Bool {
+        switch self {
+        case .starting, .recording: true
+        default: false
+        }
+    }
+
+    var hasRecordingReady: Bool {
+        if case .ready = self { true } else { false }
+    }
+
+    private static func time(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
 enum AppShellError: Equatable, LocalizedError, Sendable {
     case apiKeyStatusUnavailable
     case apiKeyInvalid
@@ -105,6 +140,15 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
     case pasteEventCreationFailed
     case pasteFailed
     case pasteLastMonitorFailed
+    case microphonePermissionRequired
+    case microphonePermissionRestricted
+    case microphoneSettingsUnavailable
+    case recordingAlreadyActive
+    case noActiveRecording
+    case recordingStartFailed
+    case recordingEncodingFailed
+    case temporaryAudioCleanupFailed
+    case audioPlaybackFailed
 
     var errorDescription: String? {
         switch self {
@@ -134,6 +178,24 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "dict8 could not complete the paste."
         case .pasteLastMonitorFailed:
             "dict8 could not start the Paste Last shortcut monitor."
+        case .microphonePermissionRequired:
+            "Microphone permission is required to record dictation."
+        case .microphonePermissionRestricted:
+            "Microphone access is restricted on this Mac."
+        case .microphoneSettingsUnavailable:
+            "dict8 could not open Microphone settings."
+        case .recordingAlreadyActive:
+            "A recording is already active."
+        case .noActiveRecording:
+            "There is no active recording to stop."
+        case .recordingStartFailed:
+            "dict8 could not start recording from the current microphone."
+        case .recordingEncodingFailed:
+            "dict8 could not finish the audio recording."
+        case .temporaryAudioCleanupFailed:
+            "dict8 could not remove a temporary audio file."
+        case .audioPlaybackFailed:
+            "dict8 could not play the temporary recording."
         }
     }
 }
@@ -144,13 +206,15 @@ struct AppConfiguration: Equatable, Sendable {
     let hudPreviewDuration: Duration
     let testPasteDelay: Duration
     let testPasteText: String
+    let testRecordingLifetime: Duration
 
     static let v0 = AppConfiguration(
         hotkeyDisplayName: "Control + Option",
         pasteLastHotkeyDisplayName: "Command + Control + V",
         hudPreviewDuration: .seconds(2),
         testPasteDelay: .seconds(3),
-        testPasteText: "dict8 paste test"
+        testPasteText: "dict8 paste test",
+        testRecordingLifetime: .seconds(10 * 60)
     )
 }
 
@@ -162,7 +226,9 @@ final class AppState: ObservableObject {
     @Published private(set) var apiKeyStatus: APIKeyStatus = .checking
     @Published private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .notRegistered
     @Published private(set) var accessibilityStatus: AccessibilityPermissionStatus = .checking
+    @Published private(set) var microphonePermissionStatus: MicrophonePermissionStatus = .checking
     @Published private(set) var testPasteStatus: TestPasteStatus = .idle
+    @Published private(set) var audioTestStatus: AudioTestStatus = .idle
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -210,8 +276,20 @@ final class AppState: ObservableObject {
         accessibilityStatus = status
     }
 
+    func setMicrophonePermissionStatus(_ status: MicrophonePermissionStatus) {
+        microphonePermissionStatus = status
+    }
+
     func setTestPasteStatus(_ status: TestPasteStatus) {
         testPasteStatus = status
+    }
+
+    func setAudioTestStatus(_ status: AudioTestStatus) {
+        audioTestStatus = status
+    }
+
+    func setStatus(_ status: AppStatus) {
+        self.status = enabledPreference ? status : .disabled
     }
 
     func setError(_ error: AppShellError) {

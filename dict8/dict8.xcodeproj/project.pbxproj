@@ -11,6 +11,7 @@
 		A00000000000000000000005 /* AIModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AIModelConfiguration.swift */; };
 		A00000000000000000000011 /* PhaseOneAppShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* PhaseOneAppShellTests.swift */; };
 		A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* PhaseTwoPasteTests.swift */; };
+		A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PhaseThreeAudioTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,6 +30,7 @@
 		A00000000000000000000003 /* AIModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AIModelConfiguration.swift; path = ../Supporting/AIModelConfiguration.swift; sourceTree = "<group>"; };
 		A00000000000000000000012 /* PhaseOneAppShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseOneAppShellTests.swift; path = ../Tests/Unit/PhaseOneAppShellTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000014 /* PhaseTwoPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseTwoPasteTests.swift; path = ../Tests/Unit/PhaseTwoPasteTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000016 /* PhaseThreeAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseThreeAudioTests.swift; path = ../Tests/Unit/PhaseThreeAudioTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -64,6 +66,7 @@
 				A00000000000000000000002 /* PhaseZeroFoundationTests.swift */,
 				A00000000000000000000012 /* PhaseOneAppShellTests.swift */,
 				A00000000000000000000014 /* PhaseTwoPasteTests.swift */,
+				A00000000000000000000016 /* PhaseThreeAudioTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -204,6 +207,7 @@
 				A00000000000000000000004 /* PhaseZeroFoundationTests.swift in Sources */,
 				A00000000000000000000011 /* PhaseOneAppShellTests.swift in Sources */,
 				A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */,
+				A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -381,6 +385,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = dict8/dict8.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 94685W8N78;
@@ -389,6 +394,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "dict8 needs microphone access to record speech for transcription.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -421,6 +427,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = dict8/dict8.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 94685W8N78;
@@ -429,6 +436,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "dict8 needs microphone access to record speech for transcription.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

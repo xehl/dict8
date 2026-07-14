@@ -22,10 +22,9 @@ The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fall
 
 ## ADR-004 — Temporary-file lifecycle
 
-**Status:** Accepted  
-**Decision needed by:** Phase 3
+**Status:** Accepted for Phase 3
 
-Use app-owned temporary files with structured cleanup on success, service failure, cancellation, disable, and quit. Remove stale app-owned temporary files at startup after an abnormal prior termination.
+Use app-owned temporary files with structured cleanup on success, service failure, cancellation, replacement, Disable, Quit, screen lock, and sleep. The Phase 3 manual test may retain one stopped recording only until Play and Delete, explicit Delete, ten-minute expiry, or lifecycle cleanup. Startup sweeping after abnormal termination remains Phase 9 scope.
 
 ## ADR-005 — Clipboard behavior
 
@@ -55,7 +54,7 @@ Store the normal-launch API key in macOS Keychain, with `OPENROUTER_API_KEY` as 
 
 **Status:** Accepted
 
-Play an unobtrusive cue before recording starts and after recording stops so cues are not recorded. Show a small non-activating, click-through microphone HUD at the bottom-center of the active display while recording. The HUD must never take target focus.
+Play distinct, quiet synthesized cues of approximately 80 milliseconds. Finish the start cue before recording begins and stop recording before playing the stop cue so cues are not recorded. Show a small non-activating, click-through microphone HUD at the bottom-center of the active display while recording. The HUD must never take target focus.
 
 ## ADR-010 — Long recording strategy
 
@@ -68,3 +67,9 @@ Begin with one STT request per recording and no chunking. On 2026-07-11, exact 1
 **Status:** Accepted
 
 Treat transcript text as untrusted content, not model instructions. Reject empty, substantially expanded, commentary-wrapped, fenced, or obviously instruction-following cleanup output and use the raw transcript fallback. Validate behavior with synthetic fixtures rather than retained user transcripts.
+
+## ADR-012 — Automatic recording cutoff
+
+**Status:** Accepted for v0
+
+The recorder enforces the 180-second limit and returns a completed artifact without waiting for UI timing. Use the normal stop cue and a non-content capsule reading “3-minute limit reached — recording stopped.” When global push-to-talk arrives in Phase 7, the hotkey state machine must ignore the still-held chord until both modifiers are released.

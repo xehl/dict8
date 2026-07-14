@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 2 complete; approved for Phase 3
+**Status:** Phase 3 complete; approved for Phase 4
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -526,9 +526,9 @@ Live OpenRouter tests are manual and opt-in because they use credentials and API
 
 ## 12. Open decisions
 
-Phase 0 resolved the hotkey mechanism, model candidates, endpoint contracts, signing workflow, macOS security configuration, and initial no-chunking strategy. The active `CGEvent` tap and focused-element probe worked in TextEdit and a browser only after App Sandbox was disabled; Accessibility permission remains required. The following decision remains open for its implementation phase:
+Phase 0 resolved the hotkey mechanism, model candidates, endpoint contracts, signing workflow, macOS security configuration, and initial no-chunking strategy. The active `CGEvent` tap and focused-element probe worked in TextEdit and a browser only after App Sandbox was disabled; Accessibility permission remains required.
 
-1. How should an automatic 180-second stop communicate that the user may release the still-held shortcut without starting another action?
+The Phase 3 review resolved the remaining automatic-stop behavior: at 180 seconds, play the normal stop cue and show a non-content notification that the limit was reached. Phase 7 must keep the consumed shortcut latched until the still-held modifiers are fully released, preventing that release from starting another action. No product decisions are currently open.
 
 ## 13. Definition of done for v0
 

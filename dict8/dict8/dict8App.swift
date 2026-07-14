@@ -8,12 +8,19 @@ struct Dict8App: App {
     init() {
         let state = AppState()
         let accessibility = SystemAccessibilityService()
+        let microphonePermission = SystemMicrophonePermissionService()
+        let audioRecorder = SystemAudioRecordingService(
+            permissionStatus: { microphonePermission.status }
+        )
         let pasteService = SystemTextPasteService(accessibility: accessibility)
         let coordinator = AppCoordinator(
             state: state,
             apiKeyStore: SystemAPIKeyStore(),
             launchAtLoginService: SystemLaunchAtLoginService(),
             accessibility: accessibility,
+            microphonePermission: microphonePermission,
+            audioRecorder: audioRecorder,
+            audioPlayback: SystemAudioPlaybackService(),
             pasteService: pasteService,
             lastDictationCache: LastDictationCache(),
             pasteLastMonitor: SystemPasteLastHotkeyMonitor(),

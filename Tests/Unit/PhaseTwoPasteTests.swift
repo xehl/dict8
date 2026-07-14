@@ -172,7 +172,8 @@ final class PhaseTwoPasteTests: XCTestCase {
             pasteLastHotkeyDisplayName: "Command + Control + V",
             hudPreviewDuration: .zero,
             testPasteDelay: .zero,
-            testPasteText: "synthetic settings paste"
+            testPasteText: "synthetic settings paste",
+            testRecordingLifetime: .seconds(600)
         )
         let state = AppState(defaults: defaults, configuration: configuration)
         let cache = FakeCache()
@@ -199,6 +200,9 @@ final class PhaseTwoPasteTests: XCTestCase {
             accessibility: FakeAccessibility(
                 target: makeTarget(pid: 10, secureFieldStatus: .notSecure)
             ),
+            microphonePermission: FakeMicrophonePermission(),
+            audioRecorder: FakeAudioRecorder(),
+            audioPlayback: FakeAudioPlayback(),
             pasteService: FakeTextPasteService(),
             lastDictationCache: cache,
             pasteLastMonitor: monitor,
@@ -310,8 +314,36 @@ private final class FakePasteLastMonitor: PasteLastHotkeyMonitoring {
 @MainActor
 private final class FakeHUD: RecordingHUDPresenting {
     func showPreview(for duration: Duration) {}
+    func showRecording() {}
     func showFeedback(_ feedback: TransientFeedback) {}
     func hide() {}
+}
+
+@MainActor
+private final class FakeMicrophonePermission: MicrophonePermissionControlling {
+    var status: MicrophonePermissionStatus = .granted
+    func requestPermission() async -> MicrophonePermissionStatus { status }
+    func openSystemSettings() -> Bool { true }
+}
+
+@MainActor
+private final class FakeAudioRecorder: AudioRecording {
+    var isRecording = false
+    var elapsedTime: TimeInterval = 0
+    var onMaximumDurationReached: ((Result<RecordedAudioFile, AudioRecordingError>) -> Void)?
+
+    func start() throws { isRecording = true }
+    func stop() throws -> RecordedAudioFile { throw AudioRecordingError.noActiveRecording }
+    func cancel() throws { isRecording = false }
+    func delete(_ recording: RecordedAudioFile) throws {}
+}
+
+@MainActor
+private final class FakeAudioPlayback: AudioPlaybackProviding {
+    func playStartCue() async throws {}
+    func playStopCue() async throws {}
+    func playPreview(at url: URL) async throws {}
+    func stop() {}
 }
 
 @MainActor

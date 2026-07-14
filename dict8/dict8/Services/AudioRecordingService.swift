@@ -1,0 +1,314 @@
+import AVFoundation
+import Foundation
+
+enum AudioRecordingError: Error, Equatable, Sendable {
+    case microphonePermissionRequired
+    case alreadyRecording
+    case noActiveRecording
+    case temporaryDirectoryCreationFailed
+    case recorderCreationFailed
+    case recordingStartFailed
+    case encodingFailed
+    case invalidRecording
+    case temporaryFileCleanupFailed
+}
+
+struct RecordedAudioFile: Equatable, Sendable {
+    let url: URL
+    let duration: TimeInterval
+    let sampleRate: Double
+    let channelCount: Int
+    let bitRate: Int
+}
+
+@MainActor
+protocol AudioRecording: AnyObject {
+    var isRecording: Bool { get }
+    var elapsedTime: TimeInterval { get }
+    var onMaximumDurationReached: ((Result<RecordedAudioFile, AudioRecordingError>) -> Void)? {
+        get set
+    }
+
+    func start() throws
+    func stop() throws -> RecordedAudioFile
+    func cancel() throws
+    func delete(_ recording: RecordedAudioFile) throws
+}
+
+@MainActor
+protocol AudioRecorderDriving: AnyObject {
+    var elapsedTime: TimeInterval { get }
+    var onFinished: ((Bool) -> Void)? { get set }
+
+    func prepareToRecord() -> Bool
+    func record(forDuration duration: TimeInterval) -> Bool
+    func stop()
+}
+
+@MainActor
+final class SystemAudioRecordingService: AudioRecording {
+    typealias RecorderFactory = (URL, [String: Any]) throws -> any AudioRecorderDriving
+
+    static let maximumDuration: TimeInterval = 180
+    static let sampleRate = 16_000.0
+    static let channelCount = 1
+    static let bitRate = 32_000
+
+    private struct ActiveRecording {
+        let identifier: UUID
+        let url: URL
+        let driver: any AudioRecorderDriving
+    }
+
+    var onMaximumDurationReached: ((Result<RecordedAudioFile, AudioRecordingError>) -> Void)?
+
+    private let fileManager: FileManager
+    private let temporaryRoot: URL
+    private let permissionStatus: () -> MicrophonePermissionStatus
+    private let recorderFactory: RecorderFactory
+    private var activeRecording: ActiveRecording?
+
+    init(
+        fileManager: FileManager = .default,
+        temporaryRoot: URL? = nil,
+        permissionStatus: @escaping () -> MicrophonePermissionStatus = {
+            SystemMicrophonePermissionService().status
+        },
+        recorderFactory: @escaping RecorderFactory = { url, settings in
+            try AVAudioRecorderDriver(url: url, settings: settings)
+        }
+    ) {
+        self.fileManager = fileManager
+        self.temporaryRoot = temporaryRoot ?? fileManager.temporaryDirectory
+        self.permissionStatus = permissionStatus
+        self.recorderFactory = recorderFactory
+    }
+
+    var isRecording: Bool {
+        activeRecording != nil
+    }
+
+    var elapsedTime: TimeInterval {
+        activeRecording?.driver.elapsedTime ?? 0
+    }
+
+    func start() throws {
+        guard permissionStatus() == .granted else {
+            throw AudioRecordingError.microphonePermissionRequired
+        }
+        guard activeRecording == nil else {
+            throw AudioRecordingError.alreadyRecording
+        }
+
+        let directory = temporaryRoot.appending(
+            component: "dict8-recordings",
+            directoryHint: .isDirectory
+        )
+        do {
+            try fileManager.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw AudioRecordingError.temporaryDirectoryCreationFailed
+        }
+
+        let url = directory
+            .appending(component: UUID().uuidString)
+            .appendingPathExtension("m4a")
+        let driver: any AudioRecorderDriving
+        do {
+            driver = try recorderFactory(url, Self.settings)
+        } catch {
+            try removeIfPresent(url)
+            throw AudioRecordingError.recorderCreationFailed
+        }
+
+        let identifier = UUID()
+        driver.onFinished = { [weak self] succeeded in
+            self?.handleAutomaticFinish(identifier: identifier, succeeded: succeeded)
+        }
+
+        guard driver.prepareToRecord(),
+              driver.record(forDuration: Self.maximumDuration) else {
+            driver.onFinished = nil
+            driver.stop()
+            try removeIfPresent(url)
+            throw AudioRecordingError.recordingStartFailed
+        }
+
+        activeRecording = ActiveRecording(
+            identifier: identifier,
+            url: url,
+            driver: driver
+        )
+    }
+
+    func stop() throws -> RecordedAudioFile {
+        guard let activeRecording else {
+            throw AudioRecordingError.noActiveRecording
+        }
+
+        let duration = activeRecording.driver.elapsedTime
+        self.activeRecording = nil
+        activeRecording.driver.onFinished = nil
+        activeRecording.driver.stop()
+
+        do {
+            return try artifact(at: activeRecording.url, duration: duration)
+        } catch {
+            try removeIfPresent(activeRecording.url)
+            throw error
+        }
+    }
+
+    func cancel() throws {
+        guard let activeRecording else { return }
+        self.activeRecording = nil
+        activeRecording.driver.onFinished = nil
+        activeRecording.driver.stop()
+        try removeIfPresent(activeRecording.url)
+    }
+
+    func delete(_ recording: RecordedAudioFile) throws {
+        try removeIfPresent(recording.url)
+    }
+
+    private func handleAutomaticFinish(identifier: UUID, succeeded: Bool) {
+        guard let activeRecording,
+              activeRecording.identifier == identifier else {
+            return
+        }
+
+        self.activeRecording = nil
+        activeRecording.driver.onFinished = nil
+
+        guard succeeded else {
+            do {
+                try removeIfPresent(activeRecording.url)
+                onMaximumDurationReached?(.failure(.encodingFailed))
+            } catch {
+                onMaximumDurationReached?(.failure(.temporaryFileCleanupFailed))
+            }
+            return
+        }
+
+        let duration = activeRecording.driver.elapsedTime
+        guard duration >= Self.maximumDuration - 0.5 else {
+            do {
+                try removeIfPresent(activeRecording.url)
+                onMaximumDurationReached?(.failure(.encodingFailed))
+            } catch {
+                onMaximumDurationReached?(.failure(.temporaryFileCleanupFailed))
+            }
+            return
+        }
+
+        do {
+            let result = try artifact(
+                at: activeRecording.url,
+                duration: duration
+            )
+            onMaximumDurationReached?(.success(result))
+        } catch let error as AudioRecordingError {
+            do {
+                try removeIfPresent(activeRecording.url)
+                onMaximumDurationReached?(.failure(error))
+            } catch {
+                onMaximumDurationReached?(.failure(.temporaryFileCleanupFailed))
+            }
+        } catch {
+            onMaximumDurationReached?(.failure(.invalidRecording))
+        }
+    }
+
+    private func artifact(at url: URL, duration: TimeInterval) throws -> RecordedAudioFile {
+        let values: URLResourceValues
+        do {
+            values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        } catch {
+            throw AudioRecordingError.invalidRecording
+        }
+
+        guard values.isRegularFile == true,
+              let fileSize = values.fileSize,
+              fileSize > 0,
+              duration > 0 else {
+            throw AudioRecordingError.invalidRecording
+        }
+
+        return RecordedAudioFile(
+            url: url,
+            duration: duration,
+            sampleRate: Self.sampleRate,
+            channelCount: Self.channelCount,
+            bitRate: Self.bitRate
+        )
+    }
+
+    private func removeIfPresent(_ url: URL) throws {
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        do {
+            try fileManager.removeItem(at: url)
+        } catch {
+            throw AudioRecordingError.temporaryFileCleanupFailed
+        }
+    }
+
+    private static let settings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: sampleRate,
+        AVNumberOfChannelsKey: channelCount,
+        AVEncoderBitRateKey: bitRate,
+        AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue,
+    ]
+}
+
+@MainActor
+// AVAudioRecorderDelegate retains legacy nonisolated requirements; this adapter and recorder
+// are created and serviced on the main run loop, so the preconcurrency bridge is intentional.
+private final class AVAudioRecorderDriver: NSObject, AudioRecorderDriving, @preconcurrency AVAudioRecorderDelegate {
+    var onFinished: ((Bool) -> Void)?
+
+    private let recorder: AVAudioRecorder
+
+    init(url: URL, settings: [String: Any]) throws {
+        do {
+            recorder = try AVAudioRecorder(url: url, settings: settings)
+        } catch {
+            throw AudioRecordingError.recorderCreationFailed
+        }
+        super.init()
+        recorder.delegate = self
+    }
+
+    var elapsedTime: TimeInterval {
+        recorder.currentTime
+    }
+
+    func prepareToRecord() -> Bool {
+        recorder.prepareToRecord()
+    }
+
+    func record(forDuration duration: TimeInterval) -> Bool {
+        recorder.record(forDuration: duration)
+    }
+
+    func stop() {
+        recorder.stop()
+    }
+
+    func audioRecorderDidFinishRecording(
+        _ recorder: AVAudioRecorder,
+        successfully flag: Bool
+    ) {
+        onFinished?(flag)
+    }
+
+    func audioRecorderEncodeErrorDidOccur(
+        _ recorder: AVAudioRecorder,
+        error: (any Error)?
+    ) {
+        onFinished?(false)
+    }
+}
