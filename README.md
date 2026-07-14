@@ -6,33 +6,30 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-Phase 0 foundation and validation is complete. The repository contains a signed macOS Xcode project, tests, a temporary validation probe, verified OpenRouter contracts, and content-free benchmark results. It does not yet contain the Phase 1 menu bar/settings application shell or any recording, paste, or AI pipeline implementation.
+Phase 1 provides a dockless menu bar application, Settings window, explicit observable state, Keychain-backed API-key setup/status, Launch at Login, and a non-activating recording HUD preview. Recording, paste, and AI pipeline behavior begin in later phases.
 
 - Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
 - Phase 0 validation and manual checks: [docs/PHASE_ZERO_VALIDATION.md](docs/PHASE_ZERO_VALIDATION.md)
+- Phase 1 validation and manual checks: [docs/PHASE_ONE_VALIDATION.md](docs/PHASE_ONE_VALIDATION.md)
 - Verified OpenRouter contracts and candidate models: [docs/OPENROUTER_CONTRACTS.md](docs/OPENROUTER_CONTRACTS.md)
 - Privacy and logging rules: [docs/PRIVACY_AND_LOGGING.md](docs/PRIVACY_AND_LOGGING.md)
 
-## Planned source layout
+## Source layout
 
 ```text
 dict8/
-├── App/                 # App entry point, observable state, coordinator
-├── Models/              # Status, settings, results, and aggregate metrics
-├── Services/
-│   ├── Audio/           # AVFoundation recording
-│   ├── Hotkey/          # Global press/release monitoring
-│   ├── AI/              # Provider protocols and OpenRouter adapters
-│   ├── Paste/           # Clipboard and synthetic paste
-│   ├── Permissions/     # Microphone and Accessibility permissions
-│   └── Metrics/         # Content-free aggregate usage metrics
-├── Views/               # Menu bar and settings UI
-├── Supporting/          # Configuration and typed errors
-├── Tests/
-│   ├── Unit/            # Mock-driven service and coordinator tests
-│   └── Integration/     # Manual, opt-in live API tests
-└── docs/                # Engineering decisions and supporting notes
+├── dict8/
+│   ├── dict8/           # Xcode-synchronized macOS application source root
+│   │   ├── App/         # Observable state and coordinator
+│   │   ├── Services/    # Native macOS service boundaries
+│   │   ├── Views/       # Menu bar, Settings, and HUD UI
+│   │   └── PhaseZero/   # Retained validation harness
+│   └── dict8.xcodeproj/
+├── Supporting/          # Shared model configuration
+├── Tests/Unit/          # Hosted macOS unit tests
+├── Scripts/             # Explicit, opt-in development tools
+└── docs/                # Engineering decisions and validation notes
 ```
 
 ## Development principles
