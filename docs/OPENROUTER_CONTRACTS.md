@@ -1,6 +1,6 @@
 # OpenRouter Contracts — Phase 0
 
-Verified against official OpenRouter documentation and the public Models API on 2026-07-10. Re-verify before implementing Phase 4–6 because schemas, models, endpoints, prices, and privacy routes can change.
+Verified against official OpenRouter documentation and the public Models API on 2026-07-14. Re-verify before implementing Phases 5–6 because schemas, models, endpoints, prices, and privacy routes can change.
 
 ## Speech-to-text
 
@@ -35,6 +35,8 @@ Official references:
 
 Every request must include `provider.zdr: true`. This restricts routing to endpoints OpenRouter currently marks as Zero Data Retention. A model can become unavailable under this restriction even if it remains generally available.
 
+OpenRouter may use its default provider fallback among ZDR-compatible endpoints for the one requested model. dict8 does not need to send `allow_fallbacks`, and must not send the `models` or `route` fields for automatic multi-model routing. Instead, dict8 owns the configured second-model attempt and can report when the pinned model failed. The transcription OpenAPI schema currently describes `provider` as a passthrough object rather than the full chat `ProviderPreferences` schema; the Phase 0 live benchmark verified that per-request `provider.zdr: true` is honored by the transcription endpoint.
+
 - [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr)
 - Public discovery query: `GET /api/v1/models?zdr=true`
 - STT discovery query used: `GET /api/v1/models?output_modalities=transcription&zdr=true`
@@ -50,9 +52,9 @@ These are explicit candidates, not quality claims. The cleanup corpus and manual
 
 ## Errors and attempt policy
 
-OpenRouter documents typed errors including authentication, payment required, rate limit, provider unavailable/overloaded, payload too large, invalid request, content policy, server, and timeout. `429` and `503` may include `Retry-After`.
+OpenRouter documents typed errors including authentication, payment required, rate limit, provider unavailable/overloaded, payload too large, invalid request, content policy, server, and timeout. `429` and `503` may include `Retry-After` as delta-seconds or an HTTP date.
 
-dict8 permits two total model attempts per stage. Authentication, insufficient credits, malformed requests, unsupported/oversized media, decoding failures, empty successful output, and invalid cleanup output do not trigger fallback.
+dict8 permits two total model attempts per stage. Network interruption and HTTP 408, 429, 500, 502, 503, and 504 may trigger the explicit fallback. Authentication, insufficient credits, HTTP 404 configuration errors, malformed requests, unsupported/oversized media, decoding failures, empty successful output, and invalid cleanup output do not trigger fallback. A `Retry-After` wait is honored only when it fits within the caller-supplied total stage deadline.
 
 - [Errors and debugging](https://openrouter.ai/docs/api/reference/errors-and-debugging)
 

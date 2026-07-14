@@ -1,5 +1,10 @@
 import Foundation
 
+struct AIModelPair: Equatable, Sendable {
+    let primary: String
+    let fallback: String
+}
+
 struct AIModelConfiguration: Equatable, Sendable {
     let transcriptionModel: String
     let transcriptionFallbackModel: String
@@ -12,4 +17,12 @@ struct AIModelConfiguration: Equatable, Sendable {
         cleanupModel: "google/gemini-2.5-flash-lite",
         cleanupFallbackModel: "anthropic/claude-haiku-4.5"
     )
+
+    var transcription: AIModelPair {
+        AIModelPair(primary: transcriptionModel, fallback: transcriptionFallbackModel)
+    }
+
+    var cleanup: AIModelPair {
+        AIModelPair(primary: cleanupModel, fallback: cleanupFallbackModel)
+    }
 }

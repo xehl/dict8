@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 3 complete; approved for Phase 4
+**Status:** Phase 4 complete; approved for Phase 5
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -266,6 +266,8 @@ The coordinator owns this pipeline and depends on protocols for recording, trans
 - Provider protocols separating orchestration from OpenRouter-specific adapters
 
 Each stage makes at most two model attempts total: the pinned model and one configured fallback. Fallback is eligible for model/provider unavailability, timeouts, rate limits, and transient server or network failures. Authentication, insufficient credits, invalid requests, unsupported media, oversized payloads, decoding errors, secure-field refusal, and invalid successful output do not trigger model fallback. Respect a reasonable `Retry-After` value without exceeding the stage deadline.
+
+Within either explicit model attempt, OpenRouter may route across ZDR-compatible provider endpoints for that same model. dict8 does not use OpenRouter's automatic multi-model routing; it owns the single model fallback so fallback state and notification behavior remain explicit.
 
 Model identifiers live in one configuration type. They must be verified against current OpenRouter documentation at implementation time; this document intentionally does not invent model slugs.
 

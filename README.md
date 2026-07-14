@@ -6,7 +6,7 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-Phase 3 provides the dockless menu bar and safe-paste foundation plus microphone permission handling, temporary mono AAC recording, start/stop cues, elapsed time, playback validation, lifecycle cleanup, and a 180-second cutoff. OpenRouter transport begins in Phase 4; global push-to-talk arrives in Phase 7.
+Phase 4 adds the secure, mockable OpenRouter transport foundation: Keychain or development-override authentication, mandatory per-request ZDR, explicit model fallback, sanitized errors, cancellation, and stage deadlines. Speech-to-text integration begins in Phase 5; global push-to-talk arrives in Phase 7.
 
 - Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
@@ -14,6 +14,7 @@ Phase 3 provides the dockless menu bar and safe-paste foundation plus microphone
 - Phase 1 validation and manual checks: [docs/PHASE_ONE_VALIDATION.md](docs/PHASE_ONE_VALIDATION.md)
 - Phase 2 validation and manual checks: [docs/PHASE_TWO_VALIDATION.md](docs/PHASE_TWO_VALIDATION.md)
 - Phase 3 validation and manual checks: [docs/PHASE_THREE_VALIDATION.md](docs/PHASE_THREE_VALIDATION.md)
+- Phase 4 validation and manual checks: [docs/PHASE_FOUR_VALIDATION.md](docs/PHASE_FOUR_VALIDATION.md)
 - Verified OpenRouter contracts and candidate models: [docs/OPENROUTER_CONTRACTS.md](docs/OPENROUTER_CONTRACTS.md)
 - Privacy and logging rules: [docs/PRIVACY_AND_LOGGING.md](docs/PRIVACY_AND_LOGGING.md)
 

@@ -365,9 +365,10 @@ Pin explicit primary and fallback models for v0.
 Do not use:
 
 * Automatic model routing
-* Provider fallback routing
 * More than one explicit cleanup fallback
 * More than one explicit STT fallback
+
+OpenRouter may route one explicitly requested model across multiple ZDR-compatible provider endpoints. This provider-level routing does not count as another model attempt. Do not use OpenRouter's automatic multi-model routing; dict8 owns the one explicit model fallback and its notification behavior.
 
 The single explicit fallback per stage is approved. It must be configured centrally, ZDR-compatible, and attempted only for the eligible failure classes defined in `PRD.md`.
 
@@ -585,6 +586,7 @@ Allow at most two model attempts per AI stage: the pinned model and one configur
 Use the fallback only for eligible availability or transient failures:
 
 * Network interruption
+* HTTP 408
 * HTTP 429
 * HTTP 500
 * HTTP 502

@@ -12,6 +12,7 @@
 		A00000000000000000000011 /* PhaseOneAppShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* PhaseOneAppShellTests.swift */; };
 		A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* PhaseTwoPasteTests.swift */; };
 		A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PhaseThreeAudioTests.swift */; };
+		A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 		A00000000000000000000012 /* PhaseOneAppShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseOneAppShellTests.swift; path = ../Tests/Unit/PhaseOneAppShellTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000014 /* PhaseTwoPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseTwoPasteTests.swift; path = ../Tests/Unit/PhaseTwoPasteTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PhaseThreeAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseThreeAudioTests.swift; path = ../Tests/Unit/PhaseThreeAudioTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFourOpenRouterTransportTests.swift; path = ../Tests/Unit/PhaseFourOpenRouterTransportTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -67,6 +69,7 @@
 				A00000000000000000000012 /* PhaseOneAppShellTests.swift */,
 				A00000000000000000000014 /* PhaseTwoPasteTests.swift */,
 				A00000000000000000000016 /* PhaseThreeAudioTests.swift */,
+				A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -208,6 +211,7 @@
 				A00000000000000000000011 /* PhaseOneAppShellTests.swift in Sources */,
 				A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */,
 				A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */,
+				A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

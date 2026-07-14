@@ -368,6 +368,7 @@ private final class FakeAudioHUD: RecordingHUDPresenting {
 
 private actor FakeAudioAPIKeyStore: APIKeyStoring {
     func status() -> APIKeyStatus { .missing }
+    func apiKey() throws -> String { throw APIKeyStoreError.missingKey }
     func save(_ key: String) {}
     func remove() {}
 }

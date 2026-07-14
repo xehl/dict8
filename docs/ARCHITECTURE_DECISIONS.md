@@ -16,9 +16,9 @@ v0 is developed and tested on macOS 26.5 for Apple silicon with a macOS 26.0 dep
 
 ## ADR-003 — OpenRouter contracts and pinned models
 
-**Status:** Contracts and candidates verified; STT live route verified, cleanup live behavior pending
+**Status:** Contracts, candidates, and shared transport verified; adapter behavior pending
 
-The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fallback for STT, and `google/gemini-2.5-flash-lite` with `anthropic/claude-haiku-4.5` fallback for cleanup. They appeared in the relevant public Models API queries with ZDR filtering on 2026-07-10. Both attempts must enforce per-request ZDR, and each stage permits at most two total model attempts. Re-verify before Phase 4–6 and validate quality/latency through explicit manual tests.
+The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fallback for STT, and `google/gemini-2.5-flash-lite` with `anthropic/claude-haiku-4.5` fallback for cleanup. They appeared again in the relevant public Models API queries with ZDR filtering on 2026-07-14. Both attempts must enforce per-request ZDR, and each stage permits at most two total model attempts. Re-verify before Phases 5–6 and validate quality/latency through explicit manual tests.
 
 ## ADR-004 — Temporary-file lifecycle
 
@@ -73,3 +73,9 @@ Treat transcript text as untrusted content, not model instructions. Reject empty
 **Status:** Accepted for v0
 
 The recorder enforces the 180-second limit and returns a completed artifact without waiting for UI timing. Use the normal stop cue and a non-content capsule reading “3-minute limit reached — recording stopped.” When global push-to-talk arrives in Phase 7, the hotkey state machine must ignore the still-held chord until both modifiers are released.
+
+## ADR-013 — OpenRouter routing and retry ownership
+
+**Status:** Accepted for v0
+
+Every request sets `provider.zdr` to `true`. OpenRouter may route one explicitly requested model across multiple qualifying provider endpoints, preserving model behavior while improving availability. dict8 never supplies OpenRouter's automatic multi-model routing fields; it sends the centrally configured fallback model itself only after an eligible network failure or HTTP 408, 429, 500, 502, 503, or 504 response. HTTP 404 is a terminal configuration error. The caller supplies one deadline for the entire stage, including any valid `Retry-After` wait and the fallback attempt.

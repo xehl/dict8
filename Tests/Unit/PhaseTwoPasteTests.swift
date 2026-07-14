@@ -267,6 +267,7 @@ private final class FakePasteEventPoster: PasteEventPosting {
 
 private actor FakeAPIKeyStore: APIKeyStoring {
     func status() -> APIKeyStatus { .missing }
+    func apiKey() throws -> String { throw APIKeyStoreError.missingKey }
     func save(_ key: String) {}
     func remove() {}
 }
