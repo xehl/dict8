@@ -205,6 +205,91 @@ final class PhaseThreeAudioTests: XCTestCase {
         XCTAssertEqual(state.audioTestStatus, .idle)
     }
 
+    func testTranscriptionDeletesAudioAndSettingsCloseClearsTransientText() async {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let hud = FakeAudioHUD(eventLog: eventLog)
+        let started = expectation(description: "recording started")
+        hud.onShowRecording = { started.fulfill() }
+        let speechToText = FakeAudioSpeechToText(
+            result: .success(
+                SpeechTranscription(
+                    text: "synthetic transient transcript",
+                    model: "synthetic/primary",
+                    usedFallback: false,
+                    latency: .milliseconds(10),
+                    recordedDuration: 2,
+                    usage: nil
+                )
+            )
+        )
+        let state = AppState(defaults: isolatedDefaults())
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: hud,
+            speechToText: speechToText
+        )
+
+        coordinator.startTestRecording()
+        await fulfillment(of: [started], timeout: 1)
+        coordinator.stopTestRecording()
+        let deleted = expectation(description: "transcribed audio deleted")
+        recorder.onDelete = { deleted.fulfill() }
+        coordinator.transcribeAndDeleteTestRecording()
+        await fulfillment(of: [deleted], timeout: 1)
+
+        XCTAssertEqual(state.testTranscript, "synthetic transient transcript")
+        XCTAssertEqual(state.audioTestStatus, .transcribed(usedFallback: false))
+        XCTAssertEqual(state.status, .completed)
+        XCTAssertEqual(state.audioTranscriptionTestMetadata?.model, "synthetic/primary")
+        XCTAssertEqual(
+            state.audioTranscriptionTestMetadata?.latencySeconds ?? -1,
+            0.01,
+            accuracy: 0.000_001
+        )
+
+        coordinator.closeSettingsValidation()
+
+        XCTAssertNil(state.testTranscript)
+        XCTAssertNil(state.audioTranscriptionTestMetadata)
+        XCTAssertEqual(state.audioTestStatus, .idle)
+    }
+
+    func testTranscriptionFailureStillDeletesAudioAndKeepsClipboardIndependent() async {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let hud = FakeAudioHUD(eventLog: eventLog)
+        let started = expectation(description: "recording started")
+        hud.onShowRecording = { started.fulfill() }
+        let state = AppState(defaults: isolatedDefaults())
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: hud,
+            speechToText: FakeAudioSpeechToText(
+                result: .failure(.transport(.authentication))
+            )
+        )
+
+        coordinator.startTestRecording()
+        await fulfillment(of: [started], timeout: 1)
+        coordinator.stopTestRecording()
+        let deleted = expectation(description: "failed transcription audio deleted")
+        recorder.onDelete = { deleted.fulfill() }
+        coordinator.transcribeAndDeleteTestRecording()
+        await fulfillment(of: [deleted], timeout: 1)
+
+        XCTAssertNil(state.testTranscript)
+        XCTAssertEqual(
+            state.lastError,
+            .transcriptionFailed(.transport(.authentication))
+        )
+        XCTAssertEqual(state.audioTestStatus, .idle)
+    }
+
     private func makeRecordingService(
         directory: URL,
         driver: FakeRecorderDriver
@@ -235,7 +320,8 @@ final class PhaseThreeAudioTests: XCTestCase {
             hudPreviewDuration: .zero,
             testPasteDelay: .zero,
             testPasteText: "synthetic paste",
-            testRecordingLifetime: recordingLifetime
+            testRecordingLifetime: recordingLifetime,
+            testTranscriptLifetime: .seconds(120)
         )
     }
 
@@ -243,7 +329,8 @@ final class PhaseThreeAudioTests: XCTestCase {
         state: AppState? = nil,
         recorder: FakeAudioRecorder,
         playback: FakeAudioPlayback,
-        hud: FakeAudioHUD
+        hud: FakeAudioHUD,
+        speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService()
     ) -> AppCoordinator {
         AppCoordinator(
             state: state ?? AppState(defaults: isolatedDefaults()),
@@ -253,11 +340,24 @@ final class PhaseThreeAudioTests: XCTestCase {
             microphonePermission: FakeAudioMicrophonePermission(),
             audioRecorder: recorder,
             audioPlayback: playback,
+            speechToText: speechToText,
             pasteService: FakeAudioTextPaste(),
             lastDictationCache: FakeAudioCache(),
             pasteLastMonitor: FakeAudioPasteLastMonitor(),
             hud: hud
         )
+    }
+}
+
+private actor FakeAudioSpeechToText: SpeechToTextProviding {
+    private let result: Result<SpeechTranscription, SpeechToTextError>
+
+    init(result: Result<SpeechTranscription, SpeechToTextError>) {
+        self.result = result
+    }
+
+    func transcribe(_ recording: RecordedAudioFile) throws -> SpeechTranscription {
+        try result.get()
     }
 }
 

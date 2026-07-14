@@ -1,22 +1,22 @@
 import Foundation
 
-enum OpenRouterEndpoint: String, Sendable {
+nonisolated enum OpenRouterEndpoint: String, Sendable {
     case transcription = "audio/transcriptions"
     case chatCompletions = "chat/completions"
 }
 
-struct OpenRouterRequest: Sendable {
+nonisolated struct OpenRouterRequest: Sendable {
     let endpoint: OpenRouterEndpoint
     let body: Data
 }
 
-struct OpenRouterResponse: Sendable {
+nonisolated struct OpenRouterResponse: Sendable {
     let data: Data
     let model: String
     let attemptNumber: Int
     let latency: Duration
 
-    var usedFallback: Bool { attemptNumber == 2 }
+    nonisolated var usedFallback: Bool { attemptNumber == 2 }
 }
 
 enum OpenRouterClientError: Error, Equatable, LocalizedError, Sendable {
@@ -29,6 +29,7 @@ enum OpenRouterClientError: Error, Equatable, LocalizedError, Sendable {
     case modelNotFound
     case rateLimited
     case payloadTooLarge
+    case unsupportedMedia
     case providerUnavailable
     case zdrUnavailable
     case serverFailure
@@ -57,6 +58,8 @@ enum OpenRouterClientError: Error, Equatable, LocalizedError, Sendable {
             "OpenRouter rate-limited the request."
         case .payloadTooLarge:
             "The OpenRouter request is too large."
+        case .unsupportedMedia:
+            "OpenRouter does not support the recorded audio format."
         case .providerUnavailable:
             "The OpenRouter provider is temporarily unavailable."
         case .zdrUnavailable:
@@ -324,6 +327,7 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         case "not_found": error = .modelNotFound
         case "rate_limit_exceeded": error = .rateLimited
         case "payload_too_large": error = .payloadTooLarge
+        case "unsupported_media", "unsupported_media_type": error = .unsupportedMedia
         case "provider_overloaded", "provider_unavailable": error = .providerUnavailable
         case "server", "unmapped": error = .serverFailure
         case "timeout": error = .deadlineExceeded
@@ -348,6 +352,7 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         case 404: .modelNotFound
         case 408, 504: .deadlineExceeded
         case 413: .payloadTooLarge
+        case 415: .unsupportedMedia
         case 429: .rateLimited
         case 500: .serverFailure
         case 502, 503: .providerUnavailable

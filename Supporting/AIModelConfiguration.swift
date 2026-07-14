@@ -1,11 +1,11 @@
 import Foundation
 
-struct AIModelPair: Equatable, Sendable {
+nonisolated struct AIModelPair: Equatable, Sendable {
     let primary: String
     let fallback: String
 }
 
-struct AIModelConfiguration: Equatable, Sendable {
+nonisolated struct AIModelConfiguration: Equatable, Sendable {
     let transcriptionModel: String
     let transcriptionFallbackModel: String
     let cleanupModel: String

@@ -13,6 +13,7 @@
 		A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* PhaseTwoPasteTests.swift */; };
 		A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PhaseThreeAudioTests.swift */; };
 		A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */; };
+		A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		A00000000000000000000014 /* PhaseTwoPasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseTwoPasteTests.swift; path = ../Tests/Unit/PhaseTwoPasteTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PhaseThreeAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseThreeAudioTests.swift; path = ../Tests/Unit/PhaseThreeAudioTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFourOpenRouterTransportTests.swift; path = ../Tests/Unit/PhaseFourOpenRouterTransportTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFiveSpeechToTextTests.swift; path = ../Tests/Unit/PhaseFiveSpeechToTextTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -70,6 +72,7 @@
 				A00000000000000000000014 /* PhaseTwoPasteTests.swift */,
 				A00000000000000000000016 /* PhaseThreeAudioTests.swift */,
 				A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */,
+				A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -212,6 +215,7 @@
 				A00000000000000000000013 /* PhaseTwoPasteTests.swift in Sources */,
 				A00000000000000000000015 /* PhaseThreeAudioTests.swift in Sources */,
 				A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */,
+				A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

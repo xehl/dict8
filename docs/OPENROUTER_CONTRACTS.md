@@ -1,6 +1,6 @@
 # OpenRouter Contracts — Phase 0
 
-Verified against official OpenRouter documentation and the public Models API on 2026-07-14. Re-verify before implementing Phases 5–6 because schemas, models, endpoints, prices, and privacy routes can change.
+Verified against official OpenRouter documentation, OpenAPI schema, and the public Models API on 2026-07-14. Re-verify before implementing Phase 6 because schemas, models, endpoints, prices, and privacy routes can change.
 
 ## Speech-to-text
 
@@ -10,6 +10,8 @@ Verified against official OpenRouter documentation and the public Models API on 
 - `input_audio.data` is raw base64 without a data-URI prefix.
 - Common documented formats include `wav`, `mp3`, `flac`, `m4a`, `ogg`, `webm`, and `aac`; actual support varies by provider.
 - Response includes `text` and optional `usage` values such as `seconds`, token counts, and `cost`.
+- The OpenAPI schema requires only `text` in the standard response. `verbose_json` adds duration and timestamps but is limited to OpenAI-compatible providers, so v0 uses the standard response for portability across the configured model fallback.
+- Phase 5 sends `language: "en"`, omits temperature, and shares a 45-second deadline across both explicit model attempts.
 - Multipart requests are also supported and capped at 25 MB. The JSON/base64 path remains the planned v0 integration because the PRD explicitly calls for just-in-time base64 construction.
 - OpenRouter warns that large audio can encounter upstream timeouts and recommends splitting when necessary. The 180-second requirement therefore remains a measured decision, not an assumption.
 
@@ -60,4 +62,6 @@ dict8 permits two total model attempts per stage. Network interruption and HTTP 
 
 ## Live-test status
 
-The owner explicitly opted into the synthetic STT benchmark on 2026-07-11. Exact 15-, 120-, and 180-second `.m4a` inputs all succeeded against `openai/whisper-large-v3` with per-request ZDR and no fallback. Content-free results are stored in `PHASE_ZERO_BENCHMARK_RESULTS.json`; the API key, audio, base64 payload, and transcript text were not retained. Cleanup-quality tests and representative non-repetitive prose tests remain manual and opt-in.
+The owner explicitly opted into the synthetic STT benchmark on 2026-07-11. Exact 15-, 120-, and 180-second `.m4a` inputs all succeeded against `openai/whisper-large-v3` with per-request ZDR and no fallback. Content-free results are stored in `PHASE_ZERO_BENCHMARK_RESULTS.json`; the API key, audio, base64 payload, and transcript text were not retained.
+
+On 2026-07-14 the owner authorized and passed paid Phase 5 live tests for a short recording and a representative recording longer than two minutes. No material compression or missing-section issue was reported. Transcript content was not written to documentation or logs.

@@ -86,6 +86,10 @@ struct SettingsView: View {
                     }
                 } else if appState.audioTestStatus.hasRecordingReady {
                     HStack {
+                        Button("Transcribe and Delete") {
+                            coordinator.transcribeAndDeleteTestRecording()
+                        }
+
                         Button("Play and Delete") {
                             coordinator.playAndDeleteTestRecording()
                         }
@@ -98,6 +102,10 @@ struct SettingsView: View {
                     Button("Stop Playback and Delete", role: .destructive) {
                         coordinator.cancelTestRecording()
                     }
+                } else if appState.audioTestStatus == .transcribing {
+                    Button("Cancel Transcription and Delete", role: .destructive) {
+                        coordinator.cancelTestRecording()
+                    }
                 } else {
                     Button("Start Test Recording") {
                         coordinator.startTestRecording()
@@ -108,7 +116,45 @@ struct SettingsView: View {
                     )
                 }
 
-                Text("Records mono AAC to an app-owned temporary .m4a file. A stopped test is deleted after playback, on Delete, after ten minutes, or on lifecycle cleanup.")
+                if let transcript = appState.testTranscript {
+                    ScrollView {
+                        Text(transcript)
+                            .font(.body)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    }
+                        .frame(minHeight: 100, maxHeight: 180)
+                        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
+
+                    if let metadata = appState.audioTranscriptionTestMetadata {
+                        LabeledContent("Transcription model", value: metadata.model)
+                        LabeledContent(
+                            "Model attempt",
+                            value: metadata.usedFallback ? "Explicit fallback" : "Primary"
+                        )
+                        LabeledContent(
+                            "Request latency",
+                            value: metadata.latencySeconds.formatted(.number.precision(.fractionLength(3))) + " s"
+                        )
+                        LabeledContent(
+                            "Recorded duration",
+                            value: metadata.recordedDuration.formatted(.number.precision(.fractionLength(1))) + " s"
+                        )
+                        LabeledContent(
+                            "Reported cost",
+                            value: metadata.cost.map {
+                                "$" + $0.formatted(.number.precision(.fractionLength(6)))
+                            } ?? "Not reported"
+                        )
+                    }
+
+                    Button("Clear Transcript", role: .destructive) {
+                        coordinator.clearTestTranscript()
+                    }
+                }
+
+                Text("Records mono AAC to an app-owned temporary .m4a file. Transcribe deletes the audio after success or failure. The validation transcript remains only in memory and clears after two minutes, when Settings closes, or during lifecycle cleanup.")
                     .foregroundStyle(.secondary)
             }
 
@@ -208,6 +254,7 @@ struct SettingsView: View {
         }
         .onDisappear {
             apiKey = ""
+            coordinator.closeSettingsValidation()
         }
     }
 }

@@ -173,7 +173,8 @@ final class PhaseTwoPasteTests: XCTestCase {
             hudPreviewDuration: .zero,
             testPasteDelay: .zero,
             testPasteText: "synthetic settings paste",
-            testRecordingLifetime: .seconds(600)
+            testRecordingLifetime: .seconds(600),
+            testTranscriptLifetime: .seconds(120)
         )
         let state = AppState(defaults: defaults, configuration: configuration)
         let cache = FakeCache()

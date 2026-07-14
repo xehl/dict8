@@ -97,6 +97,8 @@ enum AudioTestStatus: Equatable, Sendable {
     case recording(elapsedSeconds: Int)
     case ready(durationSeconds: Int)
     case playing
+    case transcribing
+    case transcribed(usedFallback: Bool)
 
     var displayName: String {
         switch self {
@@ -107,6 +109,9 @@ enum AudioTestStatus: Equatable, Sendable {
         case let .ready(durationSeconds):
             "Recorded \(Self.time(durationSeconds)) — temporary"
         case .playing: "Playing, then deleting"
+        case .transcribing: "Transcribing, then deleting audio"
+        case let .transcribed(usedFallback):
+            usedFallback ? "Transcribed with fallback model" : "Transcribed and deleted audio"
         }
     }
 
@@ -123,6 +128,26 @@ enum AudioTestStatus: Equatable, Sendable {
 
     private static func time(_ seconds: Int) -> String {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+nonisolated struct AudioTranscriptionTestMetadata: Equatable, Sendable {
+    let model: String
+    let usedFallback: Bool
+    let latencySeconds: Double
+    let recordedDuration: TimeInterval
+    let providerAudioSeconds: Double?
+    let cost: Double?
+
+    init(_ transcription: SpeechTranscription) {
+        model = transcription.model
+        usedFallback = transcription.usedFallback
+        let components = transcription.latency.components
+        latencySeconds = Double(components.seconds)
+            + Double(components.attoseconds) / 1_000_000_000_000_000_000
+        recordedDuration = transcription.recordedDuration
+        providerAudioSeconds = transcription.usage?.audioSeconds
+        cost = transcription.usage?.cost
     }
 }
 
@@ -149,6 +174,7 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
     case recordingEncodingFailed
     case temporaryAudioCleanupFailed
     case audioPlaybackFailed
+    case transcriptionFailed(SpeechToTextError)
 
     var errorDescription: String? {
         switch self {
@@ -196,6 +222,8 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "dict8 could not remove a temporary audio file."
         case .audioPlaybackFailed:
             "dict8 could not play the temporary recording."
+        case let .transcriptionFailed(error):
+            error.localizedDescription
         }
     }
 }
@@ -207,6 +235,7 @@ struct AppConfiguration: Equatable, Sendable {
     let testPasteDelay: Duration
     let testPasteText: String
     let testRecordingLifetime: Duration
+    let testTranscriptLifetime: Duration
 
     static let v0 = AppConfiguration(
         hotkeyDisplayName: "Control + Option",
@@ -214,7 +243,8 @@ struct AppConfiguration: Equatable, Sendable {
         hudPreviewDuration: .seconds(2),
         testPasteDelay: .seconds(3),
         testPasteText: "dict8 paste test",
-        testRecordingLifetime: .seconds(10 * 60)
+        testRecordingLifetime: .seconds(10 * 60),
+        testTranscriptLifetime: .seconds(2 * 60)
     )
 }
 
@@ -229,6 +259,8 @@ final class AppState: ObservableObject {
     @Published private(set) var microphonePermissionStatus: MicrophonePermissionStatus = .checking
     @Published private(set) var testPasteStatus: TestPasteStatus = .idle
     @Published private(set) var audioTestStatus: AudioTestStatus = .idle
+    @Published private(set) var testTranscript: String?
+    @Published private(set) var audioTranscriptionTestMetadata: AudioTranscriptionTestMetadata?
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -286,6 +318,14 @@ final class AppState: ObservableObject {
 
     func setAudioTestStatus(_ status: AudioTestStatus) {
         audioTestStatus = status
+    }
+
+    func setTestTranscript(_ transcript: String?) {
+        testTranscript = transcript
+    }
+
+    func setAudioTranscriptionTestMetadata(_ metadata: AudioTranscriptionTestMetadata?) {
+        audioTranscriptionTestMetadata = metadata
     }
 
     func setStatus(_ status: AppStatus) {

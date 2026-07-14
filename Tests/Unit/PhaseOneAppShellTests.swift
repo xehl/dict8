@@ -104,9 +104,10 @@ final class PhaseOneAppShellTests: XCTestCase {
             .recordingEncodingFailed,
             .temporaryAudioCleanupFailed,
             .audioPlaybackFailed,
+            .transcriptionFailed(.emptyTranscript),
         ].compactMap(\.errorDescription)
 
-        XCTAssertEqual(messages.count, 22)
+        XCTAssertEqual(messages.count, 23)
         XCTAssertTrue(messages.allSatisfy { !$0.contains("development-override") })
     }
 }

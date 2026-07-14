@@ -66,6 +66,7 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
             (403, "permission_denied", .forbidden),
             (404, "not_found", .modelNotFound),
             (413, "payload_too_large", .payloadTooLarge),
+            (415, "unsupported_media_type", .unsupportedMedia),
             (422, "invalid_request", .invalidRequest),
         ]
 

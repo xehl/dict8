@@ -11,6 +11,7 @@ final class AppCoordinator {
     private let microphonePermission: any MicrophonePermissionControlling
     private let audioRecorder: any AudioRecording
     private let audioPlayback: any AudioPlaybackProviding
+    private let speechToText: any SpeechToTextProviding
     private let pasteService: any TextPasting
     private let lastDictationCache: any LastDictationCaching
     private let pasteLastMonitor: any PasteLastHotkeyMonitoring
@@ -21,6 +22,7 @@ final class AppCoordinator {
     private var audioTask: Task<Void, Never>?
     private var elapsedAudioTask: Task<Void, Never>?
     private var audioExpirationTask: Task<Void, Never>?
+    private var transcriptExpirationTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
     private var audioGeneration = 0
     private var pasteGeneration = 0
@@ -35,6 +37,7 @@ final class AppCoordinator {
         microphonePermission: any MicrophonePermissionControlling,
         audioRecorder: any AudioRecording,
         audioPlayback: any AudioPlaybackProviding,
+        speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService(),
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
         pasteLastMonitor: any PasteLastHotkeyMonitoring,
@@ -47,6 +50,7 @@ final class AppCoordinator {
         self.microphonePermission = microphonePermission
         self.audioRecorder = audioRecorder
         self.audioPlayback = audioPlayback
+        self.speechToText = speechToText
         self.pasteService = pasteService
         self.lastDictationCache = lastDictationCache
         self.pasteLastMonitor = pasteLastMonitor
@@ -67,6 +71,7 @@ final class AppCoordinator {
         audioTask?.cancel()
         elapsedAudioTask?.cancel()
         audioExpirationTask?.cancel()
+        transcriptExpirationTask?.cancel()
     }
 
     func startIfNeeded() {
@@ -249,11 +254,13 @@ final class AppCoordinator {
         }
 
         guard !state.audioTestStatus.isStartingOrRecording,
-              state.audioTestStatus != .playing else {
+              state.audioTestStatus != .playing,
+              state.audioTestStatus != .transcribing else {
             state.setError(.recordingAlreadyActive)
             return
         }
 
+        clearTestTranscript()
         guard removeCompletedTestRecording() else { return }
         audioGeneration += 1
         let generation = audioGeneration
@@ -371,6 +378,96 @@ final class AppCoordinator {
     func deleteTestRecording() {
         guard testRecording != nil else { return }
         _ = removeCompletedTestRecording()
+    }
+
+    func transcribeAndDeleteTestRecording() {
+        guard let recording = testRecording else {
+            state.setError(.noActiveRecording)
+            return
+        }
+
+        clearTestTranscript()
+        audioGeneration += 1
+        let generation = audioGeneration
+        audioExpirationTask?.cancel()
+        audioExpirationTask = nil
+        audioPlayback.stop()
+        state.setAudioTestStatus(.transcribing)
+        state.setStatus(.transcribing)
+        state.clearError()
+
+        audioTask?.cancel()
+        audioTask = Task { @MainActor [weak self, speechToText] in
+            guard let self else { return }
+            do {
+                let transcription = try await speechToText.transcribe(recording)
+                try Task.checkCancellation()
+                guard self.audioGeneration == generation else { return }
+
+                do {
+                    try self.audioRecorder.delete(recording)
+                    self.testRecording = nil
+                } catch {
+                    self.state.setAudioTestStatus(
+                        .ready(durationSeconds: max(1, Int(recording.duration.rounded())))
+                    )
+                    self.state.setTestTranscript(transcription.text)
+                    self.state.setAudioTranscriptionTestMetadata(
+                        AudioTranscriptionTestMetadata(transcription)
+                    )
+                    self.scheduleTestTranscriptExpiration()
+                    self.state.setError(.temporaryAudioCleanupFailed)
+                    self.audioTask = nil
+                    return
+                }
+
+                self.state.setTestTranscript(transcription.text)
+                self.state.setAudioTranscriptionTestMetadata(
+                    AudioTranscriptionTestMetadata(transcription)
+                )
+                self.state.setAudioTestStatus(
+                    .transcribed(usedFallback: transcription.usedFallback)
+                )
+                self.state.setStatus(transcription.usedFallback ? .warning : .completed)
+                self.state.clearError()
+                self.scheduleTestTranscriptExpiration()
+            } catch is CancellationError {
+                return
+            } catch let error as SpeechToTextError {
+                guard self.audioGeneration == generation else { return }
+                if self.deleteAfterTranscription(recording) {
+                    self.state.setError(.transcriptionFailed(error))
+                }
+            } catch {
+                guard self.audioGeneration == generation else { return }
+                if self.deleteAfterTranscription(recording) {
+                    self.state.setError(.transcriptionFailed(.transport(.networkFailure)))
+                }
+            }
+
+            if self.audioGeneration == generation {
+                self.audioTask = nil
+            }
+        }
+    }
+
+    func clearTestTranscript() {
+        transcriptExpirationTask?.cancel()
+        transcriptExpirationTask = nil
+        state.setTestTranscript(nil)
+        state.setAudioTranscriptionTestMetadata(nil)
+        if case .transcribed = state.audioTestStatus {
+            state.setAudioTestStatus(.idle)
+            state.setStatus(.idle)
+        }
+    }
+
+    func closeSettingsValidation() {
+        if state.audioTestStatus == .transcribing {
+            cancelAudioTest()
+        } else {
+            clearTestTranscript()
+        }
     }
 
     func prepareForQuit() {
@@ -547,6 +644,37 @@ final class AppCoordinator {
         }
     }
 
+    private func scheduleTestTranscriptExpiration() {
+        transcriptExpirationTask?.cancel()
+        let generation = audioGeneration
+        let lifetime = state.configuration.testTranscriptLifetime
+        transcriptExpirationTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: lifetime)
+            } catch {
+                return
+            }
+            guard let self, self.audioGeneration == generation else { return }
+            self.clearTestTranscript()
+        }
+    }
+
+    private func deleteAfterTranscription(_ recording: RecordedAudioFile) -> Bool {
+        do {
+            try audioRecorder.delete(recording)
+            testRecording = nil
+            state.setAudioTestStatus(.idle)
+            state.setStatus(.idle)
+            return true
+        } catch {
+            state.setAudioTestStatus(
+                .ready(durationSeconds: max(1, Int(recording.duration.rounded())))
+            )
+            state.setError(.temporaryAudioCleanupFailed)
+            return false
+        }
+    }
+
     private func removeCompletedTestRecording() -> Bool {
         audioExpirationTask?.cancel()
         audioExpirationTask = nil
@@ -576,6 +704,10 @@ final class AppCoordinator {
         elapsedAudioTask = nil
         audioExpirationTask?.cancel()
         audioExpirationTask = nil
+        transcriptExpirationTask?.cancel()
+        transcriptExpirationTask = nil
+        state.setTestTranscript(nil)
+        state.setAudioTranscriptionTestMetadata(nil)
         audioPlayback.stop()
         hud.hide()
 
