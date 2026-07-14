@@ -22,6 +22,51 @@ struct SettingsView: View {
                 LabeledContent("Push to talk", value: appState.configuration.hotkeyDisplayName)
             }
 
+            Section("Permissions") {
+                LabeledContent(
+                    "Accessibility",
+                    value: appState.accessibilityStatus.displayName
+                )
+
+                HStack {
+                    Button("Request Accessibility") {
+                        coordinator.requestAccessibilityPermission()
+                    }
+                    .disabled(appState.accessibilityStatus == .granted)
+
+                    Button("Open Accessibility Settings") {
+                        coordinator.openAccessibilitySettings()
+                    }
+
+                    Button("Refresh") {
+                        coordinator.refreshAccessibilityPermission()
+                    }
+                }
+
+                Text("Accessibility lets dict8 inspect the focused target and synthesize paste without reading field contents.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Paste") {
+                LabeledContent(
+                    "Paste last dictation",
+                    value: appState.configuration.pasteLastHotkeyDisplayName
+                )
+                LabeledContent("Test status", value: appState.testPasteStatus.displayName)
+
+                Button("Paste Test Text in 3 Seconds") {
+                    coordinator.testPaste()
+                }
+                .disabled(
+                    !appState.isEnabled
+                        || appState.accessibilityStatus != .granted
+                        || appState.testPasteStatus == .armed
+                )
+
+                Text("After clicking, focus a TextEdit document. A successful test seeds Paste Last for ten minutes.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("OpenRouter") {
                 LabeledContent("API key", value: appState.apiKeyStatus.displayName)
 
@@ -92,7 +137,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 620)
+        .frame(width: 620, height: 760)
         .onAppear {
             coordinator.refreshConfiguration()
         }

@@ -33,6 +33,10 @@ final class PhaseOneAppShellTests: XCTestCase {
             state: state,
             apiKeyStore: FakeAPIKeyStore(),
             launchAtLoginService: FakeLaunchAtLoginService(),
+            accessibility: FakeAccessibilityService(),
+            pasteService: FakeTextPasteService(),
+            lastDictationCache: FakeLastDictationCache(),
+            pasteLastMonitor: FakePasteLastHotkeyMonitor(),
             hud: hud
         )
 
@@ -80,9 +84,17 @@ final class PhaseOneAppShellTests: XCTestCase {
             .apiKeySaveFailed,
             .apiKeyRemovalFailed,
             .launchAtLoginUpdateFailed,
+            .accessibilityPermissionRequired,
+            .accessibilitySettingsUnavailable,
+            .pasteTargetUnavailable,
+            .secureFieldRefused,
+            .clipboardWriteFailed,
+            .pasteEventCreationFailed,
+            .pasteFailed,
+            .pasteLastMonitorFailed,
         ].compactMap(\.errorDescription)
 
-        XCTAssertEqual(messages.count, 5)
+        XCTAssertEqual(messages.count, 13)
         XCTAssertTrue(messages.allSatisfy { !$0.contains("development-override") })
     }
 }
@@ -105,12 +117,52 @@ private final class FakeLaunchAtLoginService: LaunchAtLoginControlling {
 }
 
 @MainActor
+private final class FakeAccessibilityService: AccessibilityInspecting {
+    var permissionStatus: AccessibilityPermissionStatus = .granted
+
+    func requestPermission() {}
+    func openSystemSettings() -> Bool { true }
+    func captureTarget() -> PasteTarget {
+        PasteTarget(
+            bundleIdentifier: "com.example.target",
+            processIdentifier: 1,
+            secureFieldStatus: .notSecure
+        )
+    }
+}
+
+@MainActor
+private final class FakeTextPasteService: TextPasting {
+    func paste(_ text: String, originatingTarget: PasteTarget) async throws -> TextPasteResult {
+        .pasted(secureFieldStatusUnknown: false)
+    }
+}
+
+@MainActor
+private final class FakeLastDictationCache: LastDictationCaching {
+    func store(_ text: String) {}
+    func value() -> String? { nil }
+    func clear() {}
+}
+
+@MainActor
+private final class FakePasteLastHotkeyMonitor: PasteLastHotkeyMonitoring {
+    private(set) var isRunning = false
+    var onPasteLast: (() -> Void)?
+
+    func start() throws { isRunning = true }
+    func stop() { isRunning = false }
+}
+
+@MainActor
 private final class FakeRecordingHUD: RecordingHUDPresenting {
     private(set) var previewDurations: [Duration] = []
 
     func showPreview(for duration: Duration) {
         previewDurations.append(duration)
     }
+
+    func showFeedback(_ feedback: TransientFeedback) {}
 
     func hide() {}
 }

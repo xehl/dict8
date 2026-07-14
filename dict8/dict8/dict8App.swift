@@ -7,14 +7,21 @@ struct Dict8App: App {
 
     init() {
         let state = AppState()
+        let accessibility = SystemAccessibilityService()
+        let pasteService = SystemTextPasteService(accessibility: accessibility)
         let coordinator = AppCoordinator(
             state: state,
             apiKeyStore: SystemAPIKeyStore(),
             launchAtLoginService: SystemLaunchAtLoginService(),
+            accessibility: accessibility,
+            pasteService: pasteService,
+            lastDictationCache: LastDictationCache(),
+            pasteLastMonitor: SystemPasteLastHotkeyMonitor(),
             hud: RecordingHUDController()
         )
         _appState = StateObject(wrappedValue: state)
         self.coordinator = coordinator
+        coordinator.startIfNeeded()
     }
 
     var body: some Scene {

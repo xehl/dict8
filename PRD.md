@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 1 complete; approved for Phase 2
+**Status:** Phase 2 complete; approved for Phase 3
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user

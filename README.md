@@ -6,12 +6,13 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-Phase 1 provides a dockless menu bar application, Settings window, explicit observable state, Keychain-backed API-key setup/status, Launch at Login, and a non-activating recording HUD preview. Recording, paste, and AI pipeline behavior begin in later phases.
+Phase 2 provides the dockless menu bar shell plus Accessibility guidance, safe focused-application paste, secure-field refusal, a fixed Settings paste test, and a ten-minute memory-only Paste Last cache triggered by `Command + Control + V`. Recording begins in Phase 3; the OpenRouter pipeline follows in later phases.
 
 - Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
 - Phase 0 validation and manual checks: [docs/PHASE_ZERO_VALIDATION.md](docs/PHASE_ZERO_VALIDATION.md)
 - Phase 1 validation and manual checks: [docs/PHASE_ONE_VALIDATION.md](docs/PHASE_ONE_VALIDATION.md)
+- Phase 2 validation and manual checks: [docs/PHASE_TWO_VALIDATION.md](docs/PHASE_TWO_VALIDATION.md)
 - Verified OpenRouter contracts and candidate models: [docs/OPENROUTER_CONTRACTS.md](docs/OPENROUTER_CONTRACTS.md)
 - Privacy and logging rules: [docs/PRIVACY_AND_LOGGING.md](docs/PRIVACY_AND_LOGGING.md)
 

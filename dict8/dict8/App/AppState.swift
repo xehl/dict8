@@ -71,12 +71,40 @@ enum LaunchAtLoginStatus: Equatable, Sendable {
     }
 }
 
+enum TestPasteStatus: Equatable, Sendable {
+    case idle
+    case armed
+    case pasted
+    case pastedWithUnknownSecurity
+    case copiedBecauseFocusChanged
+    case failed
+
+    var displayName: String {
+        switch self {
+        case .idle: "Ready"
+        case .armed: "Focus a text field — pasting in 3 seconds"
+        case .pasted: "Test text pasted"
+        case .pastedWithUnknownSecurity: "Pasted after verifying the target app"
+        case .copiedBecauseFocusChanged: "Copied because focus changed"
+        case .failed: "Test paste failed — see Last error"
+        }
+    }
+}
+
 enum AppShellError: Equatable, LocalizedError, Sendable {
     case apiKeyStatusUnavailable
     case apiKeyInvalid
     case apiKeySaveFailed
     case apiKeyRemovalFailed
     case launchAtLoginUpdateFailed
+    case accessibilityPermissionRequired
+    case accessibilitySettingsUnavailable
+    case pasteTargetUnavailable
+    case secureFieldRefused
+    case clipboardWriteFailed
+    case pasteEventCreationFailed
+    case pasteFailed
+    case pasteLastMonitorFailed
 
     var errorDescription: String? {
         switch self {
@@ -90,17 +118,39 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "dict8 could not remove the API key from Keychain."
         case .launchAtLoginUpdateFailed:
             "dict8 could not update Launch at Login."
+        case .accessibilityPermissionRequired:
+            "Accessibility permission is required to inspect the target and paste."
+        case .accessibilitySettingsUnavailable:
+            "dict8 could not open Accessibility settings."
+        case .pasteTargetUnavailable:
+            "dict8 could not identify the focused application."
+        case .secureFieldRefused:
+            "dict8 will not paste into a known secure field."
+        case .clipboardWriteFailed:
+            "dict8 could not copy the text to the clipboard."
+        case .pasteEventCreationFailed:
+            "The text was copied, but dict8 could not create the paste event."
+        case .pasteFailed:
+            "dict8 could not complete the paste."
+        case .pasteLastMonitorFailed:
+            "dict8 could not start the Paste Last shortcut monitor."
         }
     }
 }
 
 struct AppConfiguration: Equatable, Sendable {
     let hotkeyDisplayName: String
+    let pasteLastHotkeyDisplayName: String
     let hudPreviewDuration: Duration
+    let testPasteDelay: Duration
+    let testPasteText: String
 
     static let v0 = AppConfiguration(
         hotkeyDisplayName: "Control + Option",
-        hudPreviewDuration: .seconds(2)
+        pasteLastHotkeyDisplayName: "Command + Control + V",
+        hudPreviewDuration: .seconds(2),
+        testPasteDelay: .seconds(3),
+        testPasteText: "dict8 paste test"
     )
 }
 
@@ -111,6 +161,8 @@ final class AppState: ObservableObject {
     @Published private(set) var status: AppStatus
     @Published private(set) var apiKeyStatus: APIKeyStatus = .checking
     @Published private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .notRegistered
+    @Published private(set) var accessibilityStatus: AccessibilityPermissionStatus = .checking
+    @Published private(set) var testPasteStatus: TestPasteStatus = .idle
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -152,6 +204,14 @@ final class AppState: ObservableObject {
 
     func setLaunchAtLoginStatus(_ status: LaunchAtLoginStatus) {
         launchAtLoginStatus = status
+    }
+
+    func setAccessibilityStatus(_ status: AccessibilityPermissionStatus) {
+        accessibilityStatus = status
+    }
+
+    func setTestPasteStatus(_ status: TestPasteStatus) {
+        testPasteStatus = status
     }
 
     func setError(_ error: AppShellError) {

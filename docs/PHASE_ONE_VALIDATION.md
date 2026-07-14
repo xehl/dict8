@@ -49,7 +49,7 @@ Phase 1 establishes the application shell only. It does not monitor the hotkey, 
 - The app shell performs no recording, paste, hotkey, or network behavior yet.
 - Launch at Login may require explicit approval in System Settings.
 - A development build should be copied to `/Applications` before validating Finder launch and login persistence so its path remains stable.
-- The current personal development build uses **Sign to Run Locally**. Xcode uses an ad-hoc signature and disables Hardened Runtime for that build even though the target setting remains enabled. A future hardened release build requires a valid trusted signing certificate.
+- Phase 1 was initially validated with **Sign to Run Locally**. Phase 2 switches the project to automatic Personal Team development signing so Accessibility approval can remain attached to a stable signed identity across rebuilds.
 
 ## Verified result
 
