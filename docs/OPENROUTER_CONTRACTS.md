@@ -25,8 +25,10 @@ Official references:
 - Endpoint: `POST https://openrouter.ai/api/v1/chat/completions`
 - Authentication: `Authorization: Bearer <token>`
 - Required v0 request shape: one system message, one user message containing the transcript, explicit `model`, non-streaming response, low temperature where supported, and a bounded output-token limit.
+- Phase 6 uses `temperature: 0.1`, `stream: false`, and the current `max_completion_tokens` field. It deliberately omits tools, plugins, reasoning controls, and structured response format to preserve the simplest portable text contract.
 - Read cleaned text from the first non-streaming choice message.
 - Treat empty content as failure.
+- Require a normal `stop` finish reason; truncated or otherwise incomplete output uses the raw transcript fallback.
 
 Official references:
 
@@ -65,3 +67,5 @@ dict8 permits two total model attempts per stage. Network interruption and HTTP 
 The owner explicitly opted into the synthetic STT benchmark on 2026-07-11. Exact 15-, 120-, and 180-second `.m4a` inputs all succeeded against `openai/whisper-large-v3` with per-request ZDR and no fallback. Content-free results are stored in `PHASE_ZERO_BENCHMARK_RESULTS.json`; the API key, audio, base64 payload, and transcript text were not retained.
 
 On 2026-07-14 the owner authorized and passed paid Phase 5 live tests for a short recording and a representative recording longer than two minutes. No material compression or missing-section issue was reported. Transcript content was not written to documentation or logs.
+
+On 2026-07-15 the owner authorized and passed the paid Phase 6 cleanup corpus. All six synthetic fixtures passed, including prompt-injection and legitimate meta-language cases. Only content-free outcomes were recorded.

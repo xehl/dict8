@@ -158,6 +158,91 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Cleanup test") {
+                LabeledContent("Status", value: appState.cleanupTestStatus.displayName)
+
+                Menu("Load Synthetic Sample") {
+                    ForEach(CleanupTestFixture.allCases) { fixture in
+                        Button(fixture.displayName) {
+                            coordinator.loadCleanupTestFixture(fixture)
+                        }
+                    }
+                }
+                .disabled(appState.cleanupTestStatus == .cleaning)
+
+                TextEditor(
+                    text: Binding(
+                        get: { appState.cleanupTestInput },
+                        set: { coordinator.setCleanupTestInput($0) }
+                    )
+                )
+                .font(.body)
+                .frame(minHeight: 90, maxHeight: 150)
+                .disabled(appState.cleanupTestStatus == .cleaning)
+
+                HStack {
+                    Button("Clean Text") {
+                        coordinator.runCleanupTest()
+                    }
+                    .disabled(
+                        !appState.isEnabled
+                            || appState.cleanupTestInput
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                                .isEmpty
+                            || appState.cleanupTestStatus == .cleaning
+                    )
+
+                    Button("Clear", role: .destructive) {
+                        coordinator.clearCleanupTest()
+                    }
+                    .disabled(
+                        appState.cleanupTestInput.isEmpty
+                            && appState.cleanupTestOutput == nil
+                    )
+                }
+
+                if let output = appState.cleanupTestOutput {
+                    Text(
+                        appState.cleanupTestStatus == .rawFallback
+                            ? "Result — raw fallback"
+                            : "Cleaned result"
+                    )
+                    .font(.headline)
+
+                    ScrollView {
+                        Text(output)
+                            .font(.body)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    }
+                    .frame(minHeight: 90, maxHeight: 180)
+                    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
+                }
+
+                if let metadata = appState.cleanupTestMetadata {
+                    LabeledContent("Cleanup model", value: metadata.model)
+                    LabeledContent(
+                        "Model attempt",
+                        value: metadata.usedFallback ? "Explicit fallback" : "Primary"
+                    )
+                    LabeledContent(
+                        "Request latency",
+                        value: metadata.latencySeconds
+                            .formatted(.number.precision(.fractionLength(3))) + " s"
+                    )
+                    LabeledContent(
+                        "Reported cost",
+                        value: metadata.cost.map {
+                            "$" + $0.formatted(.number.precision(.fractionLength(6)))
+                        } ?? "Not reported"
+                    )
+                }
+
+                Text("Input and output remain only in memory and clear after two minutes, when Settings closes, or during lifecycle cleanup. A rejected or failed cleanup displays the unchanged raw input.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Paste") {
                 LabeledContent(
                     "Paste last dictation",

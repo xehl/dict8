@@ -16,6 +16,7 @@ struct Dict8App: App {
         let pasteService = SystemTextPasteService(accessibility: accessibility)
         let openRouter = OpenRouterClient(apiKeyStore: apiKeyStore)
         let speechToText = OpenRouterSpeechToTextService(transport: openRouter)
+        let textCleanup = OpenRouterTextCleanupService(transport: openRouter)
         let coordinator = AppCoordinator(
             state: state,
             apiKeyStore: apiKeyStore,
@@ -25,6 +26,7 @@ struct Dict8App: App {
             audioRecorder: audioRecorder,
             audioPlayback: SystemAudioPlaybackService(),
             speechToText: speechToText,
+            textCleanup: textCleanup,
             pasteService: pasteService,
             lastDictationCache: LastDictationCache(),
             pasteLastMonitor: SystemPasteLastHotkeyMonitor(),

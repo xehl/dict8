@@ -12,6 +12,7 @@ final class AppCoordinator {
     private let audioRecorder: any AudioRecording
     private let audioPlayback: any AudioPlaybackProviding
     private let speechToText: any SpeechToTextProviding
+    private let textCleanup: any TextCleanupProviding
     private let pasteService: any TextPasting
     private let lastDictationCache: any LastDictationCaching
     private let pasteLastMonitor: any PasteLastHotkeyMonitoring
@@ -23,9 +24,12 @@ final class AppCoordinator {
     private var elapsedAudioTask: Task<Void, Never>?
     private var audioExpirationTask: Task<Void, Never>?
     private var transcriptExpirationTask: Task<Void, Never>?
+    private var cleanupTask: Task<Void, Never>?
+    private var cleanupExpirationTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
     private var audioGeneration = 0
     private var pasteGeneration = 0
+    private var cleanupGeneration = 0
     private var hasStarted = false
     private var lifecycleObservers: [NSObjectProtocol] = []
 
@@ -38,6 +42,7 @@ final class AppCoordinator {
         audioRecorder: any AudioRecording,
         audioPlayback: any AudioPlaybackProviding,
         speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService(),
+        textCleanup: any TextCleanupProviding = UnavailableTextCleanupService(),
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
         pasteLastMonitor: any PasteLastHotkeyMonitoring,
@@ -51,6 +56,7 @@ final class AppCoordinator {
         self.audioRecorder = audioRecorder
         self.audioPlayback = audioPlayback
         self.speechToText = speechToText
+        self.textCleanup = textCleanup
         self.pasteService = pasteService
         self.lastDictationCache = lastDictationCache
         self.pasteLastMonitor = pasteLastMonitor
@@ -72,6 +78,8 @@ final class AppCoordinator {
         elapsedAudioTask?.cancel()
         audioExpirationTask?.cancel()
         transcriptExpirationTask?.cancel()
+        cleanupTask?.cancel()
+        cleanupExpirationTask?.cancel()
     }
 
     func startIfNeeded() {
@@ -96,6 +104,7 @@ final class AppCoordinator {
             refreshAccessibilityPermission()
         } else {
             cancelAudioTest()
+            cancelCleanupTest(clearInput: true)
             pasteGeneration += 1
             pasteTask?.cancel()
             pasteTask = nil
@@ -468,12 +477,92 @@ final class AppCoordinator {
         } else {
             clearTestTranscript()
         }
+        cancelCleanupTest(clearInput: true)
+    }
+
+    func setCleanupTestInput(_ input: String) {
+        let hadCleanupState = state.cleanupTestStatus != .idle
+        cleanupGeneration += 1
+        cleanupTask?.cancel()
+        cleanupTask = nil
+        cleanupExpirationTask?.cancel()
+        cleanupExpirationTask = nil
+        state.setCleanupTestInput(input)
+        state.setCleanupTestOutput(nil)
+        state.setCleanupTestMetadata(nil)
+        state.setCleanupTestStatus(.idle)
+        if hadCleanupState {
+            resetOverallStatusAfterCleanupIfPossible()
+        }
+    }
+
+    func loadCleanupTestFixture(_ fixture: CleanupTestFixture) {
+        setCleanupTestInput(fixture.text)
+    }
+
+    func runCleanupTest() {
+        guard state.isEnabled,
+              state.cleanupTestStatus != .cleaning else { return }
+        let rawText = state.cleanupTestInput
+        guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            state.setError(.cleanupFailed(.invalidInput))
+            return
+        }
+
+        cleanupGeneration += 1
+        let generation = cleanupGeneration
+        cleanupTask?.cancel()
+        cleanupExpirationTask?.cancel()
+        cleanupExpirationTask = nil
+        state.setCleanupTestOutput(nil)
+        state.setCleanupTestMetadata(nil)
+        state.setCleanupTestStatus(.cleaning)
+        state.setStatus(.cleaning)
+        state.clearError()
+
+        cleanupTask = Task { @MainActor [weak self, textCleanup] in
+            guard let self else { return }
+            do {
+                let result = try await textCleanup.clean(rawText)
+                try Task.checkCancellation()
+                guard self.cleanupGeneration == generation else { return }
+                self.state.setCleanupTestOutput(result.text)
+                self.state.setCleanupTestMetadata(CleanupTestMetadata(result))
+                self.state.setCleanupTestStatus(.cleaned(usedFallback: result.usedFallback))
+                self.state.setStatus(result.usedFallback ? .warning : .completed)
+                self.state.clearError()
+                self.scheduleCleanupTestExpiration()
+            } catch is CancellationError {
+                return
+            } catch let error as TextCleanupError {
+                guard self.cleanupGeneration == generation,
+                      error != .transport(.cancelled),
+                      !Task.isCancelled else { return }
+                self.useRawCleanupFallback(rawText, error: error)
+            } catch {
+                guard self.cleanupGeneration == generation,
+                      !Task.isCancelled else { return }
+                self.useRawCleanupFallback(
+                    rawText,
+                    error: .transport(.networkFailure)
+                )
+            }
+
+            if self.cleanupGeneration == generation {
+                self.cleanupTask = nil
+            }
+        }
+    }
+
+    func clearCleanupTest() {
+        cancelCleanupTest(clearInput: true)
     }
 
     func prepareForQuit() {
         keychainTask?.cancel()
         microphonePermissionTask?.cancel()
         cancelAudioTest()
+        cancelCleanupTest(clearInput: true)
         pasteGeneration += 1
         pasteTask?.cancel()
         pasteTask = nil
@@ -659,6 +748,55 @@ final class AppCoordinator {
         }
     }
 
+    private func scheduleCleanupTestExpiration() {
+        cleanupExpirationTask?.cancel()
+        let generation = cleanupGeneration
+        let lifetime = state.configuration.testTranscriptLifetime
+        cleanupExpirationTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: lifetime)
+            } catch {
+                return
+            }
+            guard let self, self.cleanupGeneration == generation else { return }
+            self.cancelCleanupTest(clearInput: true)
+        }
+    }
+
+    private func useRawCleanupFallback(_ rawText: String, error: TextCleanupError) {
+        state.setCleanupTestOutput(rawText)
+        state.setCleanupTestMetadata(nil)
+        state.setCleanupTestStatus(.rawFallback)
+        state.setWarning(.cleanupFailed(error))
+        scheduleCleanupTestExpiration()
+    }
+
+    private func cancelCleanupTest(clearInput: Bool) {
+        let hadCleanupState = state.cleanupTestStatus != .idle
+        cleanupGeneration += 1
+        cleanupTask?.cancel()
+        cleanupTask = nil
+        cleanupExpirationTask?.cancel()
+        cleanupExpirationTask = nil
+        if clearInput {
+            state.setCleanupTestInput("")
+        }
+        state.setCleanupTestOutput(nil)
+        state.setCleanupTestMetadata(nil)
+        state.setCleanupTestStatus(.idle)
+        state.clearCleanupIssue()
+        if hadCleanupState {
+            resetOverallStatusAfterCleanupIfPossible()
+        }
+    }
+
+    private func resetOverallStatusAfterCleanupIfPossible() {
+        guard !state.audioTestStatus.isStartingOrRecording,
+              state.audioTestStatus != .transcribing,
+              state.audioTestStatus != .playing else { return }
+        state.setStatus(.idle)
+    }
+
     private func deleteAfterTranscription(_ recording: RecordedAudioFile) -> Bool {
         do {
             try audioRecorder.delete(recording)
@@ -803,6 +941,8 @@ final class AppCoordinator {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.cancelAudioTest()
+                    self?.cancelCleanupTest(clearInput: true)
+                    self?.lastDictationCache.clear()
                 }
             }
         }

@@ -87,3 +87,15 @@ Every request sets `provider.zdr` to `true`. OpenRouter may route one explicitly
 Use the common transcription JSON response rather than provider-specific `verbose_json`, because the explicit fallback is not guaranteed to support OpenAI-compatible duration and timestamp extensions. Require trimmed non-empty text; treat all usage fields independently as optional. Send the English language hint, omit temperature, and give the primary plus explicit fallback one shared 45-second deadline.
 
 The Settings “Transcribe and Delete” action is a development-validation surface, not transcript history or preview-before-paste. Its read-only transcript exists only in memory and clears explicitly, after two minutes, when Settings closes, on replacement, Disable, Quit, lock, or sleep. The coordinator owns and deletes temporary audio; the provider adapter never owns file deletion.
+
+## ADR-015 — Cleanup request, validation, and raw fallback
+
+**Status:** Validated for Phase 6
+
+Send the fixed PRD system prompt and the raw transcript as a separate user message through a standard non-streaming chat completion. Use temperature `0.1`, no tools, plugins, reasoning controls, or structured response format, and a 30-second deadline shared by the primary and explicit fallback. Bound output with `max_completion_tokens = clamp(ceil(UTF8 bytes / 3) + 32, 64, 2048)`.
+
+Trim and reject empty or incomplete output. Treat Markdown fences, unrequested commentary wrappers, substantial expansion, excessive novel vocabulary, and low source-word retention as suspicious. Suspicious successful output is not eligible for another model attempt; the coordinator uses the unchanged raw transcript and shows a content-free warning. Cancellation produces no fallback output. Raw text exists only for the active operation except when the final successful pipeline result later enters the approved Paste Last cache.
+
+The Settings cleanup harness uses source-controlled synthetic fixtures plus optional memory-only input. Input and output clear after two minutes, on replacement, Settings close, Disable, Quit, lock, or sleep. It is a validation surface, not transcript history.
+
+On 2026-07-15, all six paid live fixtures passed, including prompt-injection and legitimate meta-language cases. No validator relaxation or model change was required.
