@@ -1,6 +1,18 @@
 import AppKit
 import Foundation
 
+nonisolated struct DictationPipelineTiming: Equatable, Sendable {
+    let transcription: Duration?
+    let cleanup: Duration?
+    let paste: Duration?
+    let total: Duration
+}
+
+private enum ProductionPasteOutcome: Equatable {
+    case pasted
+    case copiedBecauseTargetChanged
+}
+
 @MainActor
 final class AppCoordinator {
     let state: AppState
@@ -17,6 +29,7 @@ final class AppCoordinator {
     private let lastDictationCache: any LastDictationCaching
     private let hotkeyMonitor: any HotkeyMonitoring
     private let hud: any RecordingHUDPresenting
+    private let pipelineTimingHandler: @MainActor (DictationPipelineTiming) -> Void
     private var keychainTask: Task<Void, Never>?
     private var pasteTask: Task<Void, Never>?
     private var microphonePermissionTask: Task<Void, Never>?
@@ -26,11 +39,15 @@ final class AppCoordinator {
     private var transcriptExpirationTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
     private var cleanupExpirationTask: Task<Void, Never>?
+    private var pipelineTask: Task<Void, Never>?
+    private var completionResetTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
     private var recordingOriginatingTarget: PasteTarget?
+    private var productionRecording: (generation: Int, file: RecordedAudioFile)?
     private var audioGeneration = 0
     private var pasteGeneration = 0
     private var cleanupGeneration = 0
+    private var pipelineGeneration = 0
     private var hasStarted = false
     private var lifecycleObservers: [NSObjectProtocol] = []
 
@@ -47,7 +64,8 @@ final class AppCoordinator {
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
         hotkeyMonitor: any HotkeyMonitoring,
-        hud: any RecordingHUDPresenting
+        hud: any RecordingHUDPresenting,
+        pipelineTimingHandler: @escaping @MainActor (DictationPipelineTiming) -> Void = { _ in }
     ) {
         self.state = state
         self.apiKeyStore = apiKeyStore
@@ -62,6 +80,7 @@ final class AppCoordinator {
         self.lastDictationCache = lastDictationCache
         self.hotkeyMonitor = hotkeyMonitor
         self.hud = hud
+        self.pipelineTimingHandler = pipelineTimingHandler
 
         hotkeyMonitor.onPushToTalkPressed = { [weak self] in
             self?.pushToTalkPressed()
@@ -87,6 +106,8 @@ final class AppCoordinator {
         transcriptExpirationTask?.cancel()
         cleanupTask?.cancel()
         cleanupExpirationTask?.cancel()
+        pipelineTask?.cancel()
+        completionResetTask?.cancel()
     }
 
     func startIfNeeded() {
@@ -110,6 +131,7 @@ final class AppCoordinator {
         if isEnabled {
             refreshAccessibilityPermission()
         } else {
+            cancelProductionPipeline()
             cancelAudioTest()
             cancelCleanupTest(clearInput: true)
             pasteGeneration += 1
@@ -172,7 +194,7 @@ final class AppCoordinator {
     }
 
     func testPaste() {
-        guard state.isEnabled else { return }
+        guard state.isEnabled, pipelineTask == nil else { return }
         guard accessibility.permissionStatus == .granted else {
             state.setAccessibilityStatus(.required)
             state.setError(.accessibilityPermissionRequired)
@@ -256,11 +278,13 @@ final class AppCoordinator {
     }
 
     func startTestRecording() {
+        guard pipelineTask == nil else { return }
         startTestRecording(originatingTarget: nil)
     }
 
     private func pushToTalkPressed() {
         guard state.isEnabled,
+              pipelineTask == nil,
               state.cleanupTestStatus != .cleaning,
               state.testPasteStatus != .armed else { return }
         switch state.audioTestStatus {
@@ -284,7 +308,7 @@ final class AppCoordinator {
         case .starting:
             cancelAudioTest()
         case .recording:
-            stopTestRecording()
+            stopActiveRecording()
         default:
             break
         }
@@ -356,6 +380,10 @@ final class AppCoordinator {
     }
 
     func stopTestRecording() {
+        stopActiveRecording()
+    }
+
+    private func stopActiveRecording() {
         guard audioRecorder.isRecording else {
             state.setError(.noActiveRecording)
             return
@@ -369,8 +397,16 @@ final class AppCoordinator {
 
         do {
             let recording = try audioRecorder.stop()
-            retainCompletedTestRecording(recording)
-            playStopCue(generation: generation)
+            if let target = recordingOriginatingTarget {
+                recordingOriginatingTarget = nil
+                startProductionPipeline(
+                    recording: recording,
+                    originatingTarget: target
+                )
+            } else {
+                retainCompletedTestRecording(recording)
+                playStopCue(generation: generation)
+            }
         } catch let error as AudioRecordingError {
             handleAudioRecordingError(error)
         } catch {
@@ -438,6 +474,7 @@ final class AppCoordinator {
     }
 
     func transcribeAndDeleteTestRecording() {
+        guard pipelineTask == nil else { return }
         guard let recording = testRecording else {
             state.setError(.noActiveRecording)
             return
@@ -551,6 +588,7 @@ final class AppCoordinator {
 
     func runCleanupTest() {
         guard state.isEnabled,
+              pipelineTask == nil,
               state.cleanupTestStatus != .cleaning else { return }
         let rawText = state.cleanupTestInput
         guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -610,6 +648,7 @@ final class AppCoordinator {
     func prepareForQuit() {
         keychainTask?.cancel()
         microphonePermissionTask?.cancel()
+        cancelProductionPipeline()
         cancelAudioTest()
         cancelCleanupTest(clearInput: true)
         pasteGeneration += 1
@@ -696,6 +735,9 @@ final class AppCoordinator {
             }
             state.clearError()
         } catch let error as TextPasteError {
+            if seedCache, error == .eventCreationFailed {
+                lastDictationCache.store(text)
+            }
             if !isPasteLast {
                 state.setTestPasteStatus(.failed)
             }
@@ -718,6 +760,313 @@ final class AppCoordinator {
         case .secureField: .secureFieldRefused
         case .clipboardWriteFailed: .clipboardWriteFailed
         case .eventCreationFailed: .pasteEventCreationFailed
+        }
+    }
+
+    private func startProductionPipeline(
+        recording: RecordedAudioFile,
+        originatingTarget: PasteTarget
+    ) {
+        pipelineGeneration += 1
+        let generation = pipelineGeneration
+        pipelineTask?.cancel()
+        completionResetTask?.cancel()
+        completionResetTask = nil
+        state.setAudioTestStatus(.idle)
+        state.setStatus(.encoding)
+        state.clearError()
+        productionRecording = (generation, recording)
+
+        pipelineTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.runProductionPipeline(
+                recording: recording,
+                originatingTarget: originatingTarget,
+                generation: generation
+            )
+        }
+    }
+
+    private func runProductionPipeline(
+        recording: RecordedAudioFile,
+        originatingTarget: PasteTarget,
+        generation: Int
+    ) async {
+        let clock = ContinuousClock()
+        let totalStart = clock.now
+        var transcriptionDuration: Duration?
+        var cleanupDuration: Duration?
+        var pasteDuration: Duration?
+        var audioNeedsDeletion = true
+
+        defer {
+            if audioNeedsDeletion,
+               !deleteProductionRecording(recording, generation: generation) {
+                state.setWarning(.temporaryAudioCleanupFailed)
+                hud.showFeedback(.temporaryAudioCleanupFailed)
+            }
+            pipelineTimingHandler(
+                DictationPipelineTiming(
+                    transcription: transcriptionDuration,
+                    cleanup: cleanupDuration,
+                    paste: pasteDuration,
+                    total: totalStart.duration(to: clock.now)
+                )
+            )
+            if pipelineGeneration == generation {
+                pipelineTask = nil
+            }
+        }
+
+        var cueFailed = false
+        do {
+            try await audioPlayback.playStopCue()
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            finishCancelledPipeline(generation: generation)
+            return
+        } catch {
+            guard !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            cueFailed = true
+            hud.showFeedback(.recordingCueFailed)
+        }
+
+        state.setStatus(.transcribing)
+        let transcriptionStart = clock.now
+        let transcription: SpeechTranscription
+        do {
+            transcription = try await speechToText.transcribe(recording)
+            transcriptionDuration = transcriptionStart.duration(to: clock.now)
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            transcriptionDuration = transcriptionStart.duration(to: clock.now)
+            finishCancelledPipeline(generation: generation)
+            return
+        } catch let error as SpeechToTextError {
+            transcriptionDuration = transcriptionStart.duration(to: clock.now)
+            guard error != .transport(.cancelled), !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            let deleted = deleteProductionRecording(recording, generation: generation)
+            audioNeedsDeletion = false
+            state.setError(
+                deleted
+                    ? .transcriptionFailed(error)
+                    : .transcriptionAndAudioCleanupFailed(error)
+            )
+            if !deleted {
+                hud.showFeedback(.temporaryAudioCleanupFailed)
+            }
+            return
+        } catch {
+            transcriptionDuration = transcriptionStart.duration(to: clock.now)
+            guard !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            let failure = SpeechToTextError.transport(.networkFailure)
+            let deleted = deleteProductionRecording(recording, generation: generation)
+            audioNeedsDeletion = false
+            state.setError(
+                deleted
+                    ? .transcriptionFailed(failure)
+                    : .transcriptionAndAudioCleanupFailed(failure)
+            )
+            if !deleted {
+                hud.showFeedback(.temporaryAudioCleanupFailed)
+            }
+            return
+        }
+
+        if transcription.usedFallback {
+            hud.showFeedback(.transcriptionFallbackUsed)
+        }
+
+        let audioDeleted = deleteProductionRecording(recording, generation: generation)
+        audioNeedsDeletion = false
+        if !audioDeleted {
+            hud.showFeedback(.temporaryAudioCleanupFailed)
+        }
+
+        state.setStatus(.cleaning)
+        let cleanupStart = clock.now
+        var finalText = transcription.text
+        var cleanupResult: TextCleanupResult?
+        var cleanupFailure: TextCleanupError?
+        do {
+            let result = try await textCleanup.clean(transcription.text)
+            cleanupDuration = cleanupStart.duration(to: clock.now)
+            try Task.checkCancellation()
+            cleanupResult = result
+            finalText = result.text
+            if result.usedFallback {
+                hud.showFeedback(.cleanupFallbackUsed)
+            }
+        } catch is CancellationError {
+            cleanupDuration = cleanupStart.duration(to: clock.now)
+            finishCancelledPipeline(generation: generation)
+            return
+        } catch let error as TextCleanupError {
+            cleanupDuration = cleanupStart.duration(to: clock.now)
+            guard error != .transport(.cancelled), !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            cleanupFailure = error
+            hud.showFeedback(.cleanupRawFallback)
+        } catch {
+            cleanupDuration = cleanupStart.duration(to: clock.now)
+            guard !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            cleanupFailure = .transport(.networkFailure)
+            hud.showFeedback(.cleanupRawFallback)
+        }
+
+        state.setStatus(.pasting)
+        let pasteStart = clock.now
+        let pasteOutcome: ProductionPasteOutcome
+        do {
+            pasteOutcome = try await pasteProductionText(
+                finalText,
+                originatingTarget: originatingTarget
+            )
+            pasteDuration = pasteStart.duration(to: clock.now)
+        } catch is CancellationError {
+            pasteDuration = pasteStart.duration(to: clock.now)
+            finishCancelledPipeline(generation: generation)
+            return
+        } catch let error as TextPasteError {
+            pasteDuration = pasteStart.duration(to: clock.now)
+            guard !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            state.setError(appError(for: error))
+            return
+        } catch {
+            pasteDuration = pasteStart.duration(to: clock.now)
+            guard !Task.isCancelled else {
+                finishCancelledPipeline(generation: generation)
+                return
+            }
+            state.setError(.pasteFailed)
+            return
+        }
+
+        if pasteOutcome == .copiedBecauseTargetChanged {
+            hud.showFeedback(.copiedBecauseFocusChanged)
+        }
+
+        let warning: AppShellError? = if !audioDeleted {
+            .temporaryAudioCleanupFailed
+        } else if pasteOutcome == .copiedBecauseTargetChanged {
+            .focusChangedCopied
+        } else if let cleanupFailure {
+            .cleanupFailed(cleanupFailure)
+        } else if cleanupResult?.usedFallback == true {
+            .cleanupFallbackUsed
+        } else if transcription.usedFallback {
+            .transcriptionFallbackUsed
+        } else if cueFailed {
+            .recordingCueFailed
+        } else {
+            nil
+        }
+
+        if let warning {
+            state.setWarning(warning)
+        } else {
+            state.setStatus(.completed)
+            state.clearError()
+            scheduleCompletedStatusReset(generation: generation)
+        }
+    }
+
+    private func pasteProductionText(
+        _ text: String,
+        originatingTarget: PasteTarget
+    ) async throws -> ProductionPasteOutcome {
+        do {
+            let result = try await pasteService.paste(
+                text,
+                originatingTarget: originatingTarget
+            )
+            try Task.checkCancellation()
+            lastDictationCache.store(text)
+            return switch result {
+            case .pasted: .pasted
+            case .copiedBecauseTargetChanged: .copiedBecauseTargetChanged
+            }
+        } catch let error as TextPasteError {
+            try Task.checkCancellation()
+            if error == .eventCreationFailed {
+                lastDictationCache.store(text)
+            }
+            throw error
+        }
+    }
+
+    private func deleteProductionRecording(
+        _ recording: RecordedAudioFile,
+        generation: Int
+    ) -> Bool {
+        guard productionRecording?.generation == generation else { return true }
+        defer { productionRecording = nil }
+        for _ in 0..<2 {
+            do {
+                try audioRecorder.delete(recording)
+                return true
+            } catch {
+                continue
+            }
+        }
+        return false
+    }
+
+    private func cancelProductionPipeline() {
+        let ownedRecording = productionRecording
+        pipelineGeneration += 1
+        pipelineTask?.cancel()
+        pipelineTask = nil
+        completionResetTask?.cancel()
+        completionResetTask = nil
+        if state.status.isProcessing {
+            state.setStatus(.idle)
+        }
+        if let ownedRecording,
+           !deleteProductionRecording(
+               ownedRecording.file,
+               generation: ownedRecording.generation
+           ) {
+            state.setWarning(.temporaryAudioCleanupFailed)
+            hud.showFeedback(.temporaryAudioCleanupFailed)
+        }
+    }
+
+    private func finishCancelledPipeline(generation: Int) {
+        guard pipelineGeneration == generation else { return }
+        state.setStatus(.idle)
+    }
+
+    private func scheduleCompletedStatusReset(generation: Int) {
+        completionResetTask?.cancel()
+        completionResetTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
+            }
+            guard let self,
+                  self.pipelineGeneration == generation,
+                  self.state.status == .completed else { return }
+            self.state.setStatus(.idle)
+            self.completionResetTask = nil
         }
     }
 
@@ -841,7 +1190,8 @@ final class AppCoordinator {
     }
 
     private func resetOverallStatusAfterCleanupIfPossible() {
-        guard !state.audioTestStatus.isStartingOrRecording,
+        guard pipelineTask == nil,
+              !state.audioTestStatus.isStartingOrRecording,
               state.audioTestStatus != .transcribing,
               state.audioTestStatus != .playing else { return }
         state.setStatus(.idle)
@@ -953,9 +1303,17 @@ final class AppCoordinator {
 
         switch result {
         case let .success(recording):
-            retainCompletedTestRecording(recording)
             hud.showFeedback(.recordingLimitReached)
-            playStopCue(generation: generation)
+            if let target = recordingOriginatingTarget {
+                recordingOriginatingTarget = nil
+                startProductionPipeline(
+                    recording: recording,
+                    originatingTarget: target
+                )
+            } else {
+                retainCompletedTestRecording(recording)
+                playStopCue(generation: generation)
+            }
         case let .failure(error):
             handleAudioRecordingError(error)
         }
@@ -995,6 +1353,7 @@ final class AppCoordinator {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
+                    self?.cancelProductionPipeline()
                     self?.cancelAudioTest()
                     self?.cancelCleanupTest(clearInput: true)
                     self?.lastDictationCache.clear()

@@ -101,3 +101,13 @@ Trim and reject empty or incomplete output. Treat Markdown fences, unrequested c
 The Settings cleanup harness uses source-controlled synthetic fixtures plus optional memory-only input. Input and output clear after two minutes, on replacement, Settings close, Disable, Quit, lock, or sleep. It is a validation surface, not transcript history.
 
 On 2026-07-15, all six paid live fixtures passed, including prompt-injection and legitimate meta-language cases. No validator relaxation or model change was required.
+
+## ADR-016 — Production pipeline ownership and terminal cleanup
+
+**Status:** Validated for Phase 8
+
+Each production recording is owned by one coordinator task after `AudioRecording.stop()` returns it. The task waits for the stop cue, transcribes, deletes audio immediately after STT no longer needs it, cleans with unchanged-raw fallback, verifies the originating application through the paste service, and then pastes or copies. Disable, Quit, screen lock, and sleep cancel the task; cancellation does not invoke cleanup fallback or paste. Settings validation tasks remain separate and cannot start while production processing is active.
+
+Temporary audio deletion receives one immediate retry. After successful STT, a persistent content-free deletion warning does not block delivery of the resulting text. If STT and deletion both fail, show a combined sanitized error. Cache the final text only after it reaches the clipboard: successful paste, focus-change copy, or paste-event failure after clipboard write. Never cache after STT failure, secure refusal, clipboard-write failure, or cancellation.
+
+Provider fallback, raw cleanup fallback, focus-copy, cue failure, and temporary-file failure use content-free feedback. Operation-local transcription, cleanup, paste, and total durations are emitted only to an in-memory callback in Phase 8; Phase 9 owns aggregate persistence and Settings metrics.

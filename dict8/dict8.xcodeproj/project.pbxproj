@@ -16,6 +16,7 @@
 		A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */; };
 		A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */; };
 		A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */; };
+		A0000000000000000000001F /* PhaseEightPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* PhaseEightPipelineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,6 +40,7 @@
 		A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFiveSpeechToTextTests.swift; path = ../Tests/Unit/PhaseFiveSpeechToTextTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSixTextCleanupTests.swift; path = ../Tests/Unit/PhaseSixTextCleanupTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSevenHotkeyTests.swift; path = ../Tests/Unit/PhaseSevenHotkeyTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000020 /* PhaseEightPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseEightPipelineTests.swift; path = ../Tests/Unit/PhaseEightPipelineTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,6 +81,7 @@
 				A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */,
 				A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */,
 				A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */,
+				A00000000000000000000020 /* PhaseEightPipelineTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -224,6 +227,7 @@
 				A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */,
 				A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */,
 				A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */,
+				A0000000000000000000001F /* PhaseEightPipelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

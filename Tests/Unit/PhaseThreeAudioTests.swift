@@ -249,7 +249,7 @@ final class PhaseThreeAudioTests: XCTestCase {
 
         XCTAssertEqual(eventLog.events.filter { $0 == "record start" }.count, 1)
         XCTAssertEqual(eventLog.events.filter { $0 == "record stop" }.count, 1)
-        XCTAssertTrue(state.audioTestStatus.hasRecordingReady)
+        XCTAssertFalse(state.audioTestStatus.hasRecordingReady)
         withExtendedLifetime(coordinator) {}
     }
 

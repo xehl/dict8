@@ -7,6 +7,11 @@ enum TransientFeedback: Equatable, Sendable {
     case pasteLastSucceeded
     case recordingLimitReached
     case secureFieldRefused
+    case recordingCueFailed
+    case transcriptionFallbackUsed
+    case cleanupFallbackUsed
+    case cleanupRawFallback
+    case temporaryAudioCleanupFailed
 
     var symbolName: String {
         switch self {
@@ -15,6 +20,10 @@ enum TransientFeedback: Equatable, Sendable {
         case .pasteLastSucceeded: "checkmark.circle"
         case .recordingLimitReached: "timer"
         case .secureFieldRefused: "lock.fill"
+        case .recordingCueFailed: "speaker.slash"
+        case .transcriptionFallbackUsed, .cleanupFallbackUsed: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .cleanupRawFallback: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
+        case .temporaryAudioCleanupFailed: "trash.slash"
         }
     }
 
@@ -25,6 +34,11 @@ enum TransientFeedback: Equatable, Sendable {
         case .pasteLastSucceeded: "Pasted last dictation"
         case .recordingLimitReached: "3-minute limit reached — recording stopped"
         case .secureFieldRefused: "Recording blocked in secure field"
+        case .recordingCueFailed: "Recording cue failed — processing continued"
+        case .transcriptionFallbackUsed: "Transcription fallback model used"
+        case .cleanupFallbackUsed: "Cleanup fallback model used"
+        case .cleanupRawFallback: "Cleanup failed — pasted raw transcript"
+        case .temporaryAudioCleanupFailed: "Temporary audio could not be deleted"
         }
     }
 }

@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 7 complete; ready for Phase 8 adversarial review
+**Status:** Phase 8 complete; ready for Phase 9 adversarial review
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -479,6 +479,8 @@ Development starts at Phase 0 because no application implementation exists yet. 
 - Temporary content is deleted after success, failure, and cancellation
 - Switching applications during processing never pastes into the new application
 - `Command + Control + V` re-pastes only a valid memory-cached result
+
+**Implementation note:** One coordinator-owned task carries each stopped production recording through stop cue, transcription, immediate audio deletion, cleanup, target-safe paste, and terminal state. Disable, Quit, lock, and sleep cancel that task. Cleanup failure pastes the unchanged raw transcript; transcription failure never invokes cleanup or paste. The cache is seeded only after final text reaches the clipboard, including copy-on-focus-change and paste-event failure after a successful clipboard write. Operation-local stage timings remain memory-only; aggregate persistence and presentation are Phase 9.
 
 ### Phase 9 — Hardening, metrics, and v0 readiness
 

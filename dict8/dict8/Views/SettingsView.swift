@@ -117,6 +117,7 @@ struct SettingsView: View {
                     .disabled(
                         !appState.isEnabled
                             || appState.microphonePermissionStatus != .granted
+                            || appState.status.isProcessing
                     )
                 }
 
@@ -172,7 +173,10 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .disabled(appState.cleanupTestStatus == .cleaning)
+                .disabled(
+                    appState.cleanupTestStatus == .cleaning
+                        || appState.status.isProcessing
+                )
 
                 TextEditor(
                     text: Binding(
@@ -182,7 +186,10 @@ struct SettingsView: View {
                 )
                 .font(.body)
                 .frame(minHeight: 90, maxHeight: 150)
-                .disabled(appState.cleanupTestStatus == .cleaning)
+                .disabled(
+                    appState.cleanupTestStatus == .cleaning
+                        || appState.status.isProcessing
+                )
 
                 HStack {
                     Button("Clean Text") {
@@ -194,6 +201,7 @@ struct SettingsView: View {
                                 .trimmingCharacters(in: .whitespacesAndNewlines)
                                 .isEmpty
                             || appState.cleanupTestStatus == .cleaning
+                            || appState.status.isProcessing
                     )
 
                     Button("Clear", role: .destructive) {
@@ -261,6 +269,7 @@ struct SettingsView: View {
                     !appState.isEnabled
                         || appState.accessibilityStatus != .granted
                         || appState.testPasteStatus == .armed
+                        || appState.status.isProcessing
                 )
 
                 Text("After clicking, focus a TextEdit document. A successful test seeds Paste Last for ten minutes.")
@@ -330,9 +339,9 @@ struct SettingsView: View {
             }
 
             if let lastError = appState.lastError {
-                Section("Last error") {
+                Section(appState.status == .warning ? "Last warning" : "Last error") {
                     Text(lastError.localizedDescription)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(appState.status == .warning ? .orange : .red)
                 }
             }
         }

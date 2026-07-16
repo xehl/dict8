@@ -27,6 +27,13 @@ enum AppStatus: Equatable, Sendable {
         case .error: "Error"
         }
     }
+
+    var isProcessing: Bool {
+        switch self {
+        case .encoding, .transcribing, .cleaning, .pasting: true
+        default: false
+        }
+    }
 }
 
 enum APIKeyStatus: Equatable, Sendable {
@@ -264,6 +271,11 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
     case recordingEncodingFailed
     case temporaryAudioCleanupFailed
     case audioPlaybackFailed
+    case recordingCueFailed
+    case transcriptionFallbackUsed
+    case cleanupFallbackUsed
+    case focusChangedCopied
+    case transcriptionAndAudioCleanupFailed(SpeechToTextError)
     case transcriptionFailed(SpeechToTextError)
     case cleanupFailed(TextCleanupError)
 
@@ -313,6 +325,16 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "dict8 could not remove a temporary audio file."
         case .audioPlaybackFailed:
             "dict8 could not play the temporary recording."
+        case .recordingCueFailed:
+            "dict8 could not play a recording cue, but processing continued."
+        case .transcriptionFallbackUsed:
+            "The primary transcription model failed; dict8 used its fallback model."
+        case .cleanupFallbackUsed:
+            "The primary cleanup model failed; dict8 used its fallback model."
+        case .focusChangedCopied:
+            "Focus changed, so dict8 copied the result instead of pasting it."
+        case let .transcriptionAndAudioCleanupFailed(error):
+            "\(error.localizedDescription) dict8 also could not delete the temporary audio file."
         case let .transcriptionFailed(error):
             error.localizedDescription
         case let .cleanupFailed(error):
