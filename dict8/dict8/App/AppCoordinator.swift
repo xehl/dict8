@@ -15,7 +15,7 @@ final class AppCoordinator {
     private let textCleanup: any TextCleanupProviding
     private let pasteService: any TextPasting
     private let lastDictationCache: any LastDictationCaching
-    private let pasteLastMonitor: any PasteLastHotkeyMonitoring
+    private let hotkeyMonitor: any HotkeyMonitoring
     private let hud: any RecordingHUDPresenting
     private var keychainTask: Task<Void, Never>?
     private var pasteTask: Task<Void, Never>?
@@ -27,6 +27,7 @@ final class AppCoordinator {
     private var cleanupTask: Task<Void, Never>?
     private var cleanupExpirationTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
+    private var recordingOriginatingTarget: PasteTarget?
     private var audioGeneration = 0
     private var pasteGeneration = 0
     private var cleanupGeneration = 0
@@ -45,7 +46,7 @@ final class AppCoordinator {
         textCleanup: any TextCleanupProviding = UnavailableTextCleanupService(),
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
-        pasteLastMonitor: any PasteLastHotkeyMonitoring,
+        hotkeyMonitor: any HotkeyMonitoring,
         hud: any RecordingHUDPresenting
     ) {
         self.state = state
@@ -59,10 +60,16 @@ final class AppCoordinator {
         self.textCleanup = textCleanup
         self.pasteService = pasteService
         self.lastDictationCache = lastDictationCache
-        self.pasteLastMonitor = pasteLastMonitor
+        self.hotkeyMonitor = hotkeyMonitor
         self.hud = hud
 
-        pasteLastMonitor.onPasteLast = { [weak self] in
+        hotkeyMonitor.onPushToTalkPressed = { [weak self] in
+            self?.pushToTalkPressed()
+        }
+        hotkeyMonitor.onPushToTalkReleased = { [weak self] in
+            self?.pushToTalkReleased()
+        }
+        hotkeyMonitor.onPasteLast = { [weak self] in
             self?.pasteLastDictation()
         }
         audioRecorder.onMaximumDurationReached = { [weak self] result in
@@ -108,7 +115,8 @@ final class AppCoordinator {
             pasteGeneration += 1
             pasteTask?.cancel()
             pasteTask = nil
-            pasteLastMonitor.stop()
+            hotkeyMonitor.stop()
+            state.setHotkeyMonitorStatus(.stopped)
             lastDictationCache.clear()
         }
     }
@@ -129,7 +137,7 @@ final class AppCoordinator {
     func refreshAccessibilityPermission() {
         let permissionStatus = accessibility.permissionStatus
         state.setAccessibilityStatus(permissionStatus)
-        updatePasteLastMonitor(for: permissionStatus)
+        updateHotkeyMonitor(for: permissionStatus)
     }
 
     func requestMicrophonePermission() {
@@ -248,6 +256,41 @@ final class AppCoordinator {
     }
 
     func startTestRecording() {
+        startTestRecording(originatingTarget: nil)
+    }
+
+    private func pushToTalkPressed() {
+        guard state.isEnabled,
+              state.cleanupTestStatus != .cleaning,
+              state.testPasteStatus != .armed else { return }
+        switch state.audioTestStatus {
+        case .idle, .transcribed:
+            break
+        default:
+            return
+        }
+
+        let target = accessibility.captureTarget()
+        guard target.secureFieldStatus != .secure else {
+            state.setError(.secureFieldRefused)
+            hud.showFeedback(.secureFieldRefused)
+            return
+        }
+        startTestRecording(originatingTarget: target)
+    }
+
+    private func pushToTalkReleased() {
+        switch state.audioTestStatus {
+        case .starting:
+            cancelAudioTest()
+        case .recording:
+            stopTestRecording()
+        default:
+            break
+        }
+    }
+
+    private func startTestRecording(originatingTarget: PasteTarget?) {
         guard state.isEnabled else { return }
         switch microphonePermission.status {
         case .granted:
@@ -271,6 +314,7 @@ final class AppCoordinator {
 
         clearTestTranscript()
         guard removeCompletedTestRecording() else { return }
+        recordingOriginatingTarget = originatingTarget
         audioGeneration += 1
         let generation = audioGeneration
         audioTask?.cancel()
@@ -295,11 +339,13 @@ final class AppCoordinator {
                 if self.audioGeneration == generation {
                     self.state.setAudioTestStatus(.idle)
                     self.state.setStatus(.idle)
+                    self.recordingOriginatingTarget = nil
                 }
             } catch let error as AudioRecordingError {
                 self.handleAudioRecordingError(error)
             } catch {
                 self.state.setAudioTestStatus(.idle)
+                self.recordingOriginatingTarget = nil
                 self.state.setError(.audioPlaybackFailed)
             }
 
@@ -329,6 +375,7 @@ final class AppCoordinator {
             handleAudioRecordingError(error)
         } catch {
             state.setAudioTestStatus(.idle)
+            recordingOriginatingTarget = nil
             state.setError(.recordingEncodingFailed)
         }
     }
@@ -367,6 +414,7 @@ final class AppCoordinator {
             do {
                 try self.audioRecorder.delete(recording)
                 self.testRecording = nil
+                self.recordingOriginatingTarget = nil
                 self.state.setAudioTestStatus(.idle)
                 if playbackFailed {
                     self.state.setError(.audioPlaybackFailed)
@@ -416,6 +464,7 @@ final class AppCoordinator {
                 do {
                     try self.audioRecorder.delete(recording)
                     self.testRecording = nil
+                    self.recordingOriginatingTarget = nil
                 } catch {
                     self.state.setAudioTestStatus(
                         .ready(durationSeconds: max(1, Int(recording.duration.rounded())))
@@ -566,7 +615,8 @@ final class AppCoordinator {
         pasteGeneration += 1
         pasteTask?.cancel()
         pasteTask = nil
-        pasteLastMonitor.stop()
+        hotkeyMonitor.stop()
+        state.setHotkeyMonitorStatus(.stopped)
         lastDictationCache.clear()
         hud.hide()
     }
@@ -801,6 +851,7 @@ final class AppCoordinator {
         do {
             try audioRecorder.delete(recording)
             testRecording = nil
+            recordingOriginatingTarget = nil
             state.setAudioTestStatus(.idle)
             state.setStatus(.idle)
             return true
@@ -824,6 +875,7 @@ final class AppCoordinator {
         do {
             try audioRecorder.delete(testRecording)
             self.testRecording = nil
+            recordingOriginatingTarget = nil
             state.setAudioTestStatus(.idle)
             state.setStatus(.idle)
             state.clearError()
@@ -859,10 +911,12 @@ final class AppCoordinator {
             do {
                 try audioRecorder.delete(testRecording)
                 self.testRecording = nil
+                recordingOriginatingTarget = nil
             } catch {
                 cleanupFailed = true
             }
         }
+        recordingOriginatingTarget = nil
 
         if cleanupFailed, let testRecording {
             state.setAudioTestStatus(
@@ -924,6 +978,7 @@ final class AppCoordinator {
              .recordingStartFailed: .recordingStartFailed
         }
         state.setError(appError)
+        recordingOriginatingTarget = nil
     }
 
     private func installLifecycleObservers() {
@@ -960,18 +1015,22 @@ final class AppCoordinator {
         )
     }
 
-    private func updatePasteLastMonitor(for permissionStatus: AccessibilityPermissionStatus) {
+    private func updateHotkeyMonitor(for permissionStatus: AccessibilityPermissionStatus) {
         guard state.isEnabled, permissionStatus == .granted else {
-            pasteLastMonitor.stop()
+            hotkeyMonitor.stop()
+            state.setHotkeyMonitorStatus(.stopped)
             return
         }
 
         do {
-            try pasteLastMonitor.start()
-        } catch PasteLastHotkeyError.accessibilityPermissionRequired {
+            try hotkeyMonitor.start()
+            state.setHotkeyMonitorStatus(.running)
+        } catch HotkeyMonitorError.accessibilityPermissionRequired {
             state.setAccessibilityStatus(.required)
+            state.setHotkeyMonitorStatus(.unavailable)
         } catch {
-            state.setError(.pasteLastMonitorFailed)
+            state.setHotkeyMonitorStatus(.unavailable)
+            state.setError(.hotkeyMonitorFailed)
         }
     }
 

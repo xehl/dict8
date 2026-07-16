@@ -29,7 +29,7 @@ struct Dict8App: App {
             textCleanup: textCleanup,
             pasteService: pasteService,
             lastDictationCache: LastDictationCache(),
-            pasteLastMonitor: SystemPasteLastHotkeyMonitor(),
+            hotkeyMonitor: SystemHotkeyMonitor(),
             hud: RecordingHUDController()
         )
         _appState = StateObject(wrappedValue: state)

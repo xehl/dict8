@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 6 complete; approved for Phase 7 review
+**Status:** Phase 7 complete; ready for Phase 8 adversarial review
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -454,6 +454,8 @@ Development starts at Phase 0 because no application implementation exists yet. 
 - Repeats and rapid invalid input cannot corrupt state
 - Listener removal and cancellation work on disable/quit
 
+**Implementation note:** Phase 7 uses one active event tap for push-to-talk and Paste Last. Either left or right `Control` plus either left or right `Option` completes the push-to-talk chord. `Command` or `Shift` makes the chord ineligible; Caps Lock and `fn` do not. Only the chord-completing modifier transition and its matching release are consumed, and the state machine requires both required modifier families to be released before rearming after a stop, interruption, disable/re-enable, listener restart, or the 180-second cutoff. This phase leaves stopped audio ready for explicit Settings validation; automatic transcription, cleanup, and paste begin in Phase 8.
+
 ### Phase 8 — Full pipeline and failure semantics
 
 **Goal:** Deliver the complete v0 journey.
@@ -530,7 +532,7 @@ Live OpenRouter tests are manual and opt-in because they use credentials and API
 
 Phase 0 resolved the hotkey mechanism, model candidates, endpoint contracts, signing workflow, macOS security configuration, and initial no-chunking strategy. The active `CGEvent` tap and focused-element probe worked in TextEdit and a browser only after App Sandbox was disabled; Accessibility permission remains required.
 
-The Phase 3 review resolved the remaining automatic-stop behavior: at 180 seconds, play the normal stop cue and show a non-content notification that the limit was reached. Phase 7 must keep the consumed shortcut latched until the still-held modifiers are fully released, preventing that release from starting another action. No product decisions are currently open.
+The Phase 3 review resolved the remaining automatic-stop behavior: at 180 seconds, play the normal stop cue and show a non-content notification that the limit was reached. Phase 7 implements the required physical-key latch until both modifier families are fully released. The selected chord can conflict with macOS VoiceOver's `Control + Option` commands when VoiceOver is enabled; configurable shortcuts remain post-v0 scope. No product decisions are currently open.
 
 ## 13. Definition of done for v0
 

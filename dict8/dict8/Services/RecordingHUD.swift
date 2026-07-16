@@ -6,6 +6,7 @@ enum TransientFeedback: Equatable, Sendable {
     case pasteLastUnavailable
     case pasteLastSucceeded
     case recordingLimitReached
+    case secureFieldRefused
 
     var symbolName: String {
         switch self {
@@ -13,6 +14,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .pasteLastUnavailable: "clock.badge.exclamationmark"
         case .pasteLastSucceeded: "checkmark.circle"
         case .recordingLimitReached: "timer"
+        case .secureFieldRefused: "lock.fill"
         }
     }
 
@@ -22,6 +24,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .pasteLastUnavailable: "No recent dictation"
         case .pasteLastSucceeded: "Pasted last dictation"
         case .recordingLimitReached: "3-minute limit reached — recording stopped"
+        case .secureFieldRefused: "Recording blocked in secure field"
         }
     }
 }

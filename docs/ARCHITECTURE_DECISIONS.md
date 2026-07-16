@@ -4,9 +4,11 @@ This file records implementation decisions that must be verified rather than ass
 
 ## ADR-001 — Global push-to-talk mechanism
 
-**Status:** Phase 0 prototype validated
+**Status:** Validated for Phase 7
 
-Phase 0 uses an active `CGEvent` tap over modifier events because it exposes separate transitions and can suppress delivery. On 2026-07-10, the owner reported successful press/release and target capture checks in TextEdit and a browser. Consuming a modifier-only chord can disable ordinary Control/Option shortcuts while active; that tradeoff is accepted for personal v0 but remains a reason to keep the eventual service abstract for a future configurable shortcut or chord-emitting external button.
+Use one active `CGEvent` tap for both push-to-talk and Paste Last so two listeners cannot disagree about suppression or lifecycle. Either left/right `Control` plus either left/right `Option` completes push-to-talk. Reject `Command` and `Shift`; allow Caps Lock and `fn`. Consume only the second required modifier transition and its corresponding release, preserving balanced input for the foreground app while passing unrelated keys. Emit one press and one release, suppress duplicates, and require both modifier families to be physically released before rearming after interruption, disable/re-enable, listener start while held, or the automatic cutoff.
+
+On 2026-07-10, the Phase 0 tap passed press/release and target-capture checks in TextEdit and a browser. `Control + Option` is also the macOS VoiceOver modifier, so dict8's v0 shortcut conflicts with VoiceOver commands while dict8 is enabled. This is accepted for the owner's personal v0; configurable shortcuts and external-button input remain future scope. Keep the monitor behind `HotkeyMonitoring`.
 
 ## ADR-002 — macOS deployment and signing
 

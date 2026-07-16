@@ -50,6 +50,10 @@ struct SettingsView: View {
                     "Accessibility",
                     value: appState.accessibilityStatus.displayName
                 )
+                LabeledContent(
+                    "Global shortcuts",
+                    value: appState.hotkeyMonitorStatus.displayName
+                )
 
                 HStack {
                     Button("Request Accessibility") {

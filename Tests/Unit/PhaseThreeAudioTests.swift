@@ -178,6 +178,108 @@ final class PhaseThreeAudioTests: XCTestCase {
         XCTAssertTrue(eventLog.events.contains("HUD hide"))
     }
 
+    func testPushToTalkRefusesKnownSecureFieldBeforeRecording() {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let monitor = FakeAudioPasteLastMonitor()
+        let accessibility = FakeAudioAccessibility(secureFieldStatus: .secure)
+        let state = AppState(defaults: isolatedDefaults())
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: FakeAudioHUD(eventLog: eventLog),
+            accessibility: accessibility,
+            monitor: monitor
+        )
+
+        monitor.onPushToTalkPressed?()
+
+        XCTAssertEqual(state.lastError, .secureFieldRefused)
+        XCTAssertFalse(recorder.isRecording)
+        XCTAssertFalse(eventLog.events.contains("start cue"))
+        XCTAssertTrue(eventLog.events.contains("HUD feedback"))
+        withExtendedLifetime(coordinator) {}
+    }
+
+    func testPushToTalkReleaseDuringStartCueCancelsWithoutRecording() async {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let monitor = FakeAudioPasteLastMonitor()
+        let state = AppState(defaults: isolatedDefaults())
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: FakeAudioHUD(eventLog: eventLog),
+            monitor: monitor
+        )
+
+        monitor.onPushToTalkPressed?()
+        XCTAssertEqual(state.audioTestStatus, .starting)
+        monitor.onPushToTalkReleased?()
+        await Task.yield()
+        await Task.yield()
+
+        XCTAssertEqual(state.audioTestStatus, .idle)
+        XCTAssertFalse(eventLog.events.contains("record start"))
+        XCTAssertEqual(recorder.cancelCount, 1)
+        withExtendedLifetime(coordinator) {}
+    }
+
+    func testPushToTalkPressAndReleaseProduceOneRecording() async {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let monitor = FakeAudioPasteLastMonitor()
+        let hud = FakeAudioHUD(eventLog: eventLog)
+        let recordingStarted = expectation(description: "push-to-talk recording started")
+        hud.onShowRecording = { recordingStarted.fulfill() }
+        let state = AppState(defaults: isolatedDefaults())
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: hud,
+            monitor: monitor
+        )
+
+        monitor.onPushToTalkPressed?()
+        await fulfillment(of: [recordingStarted], timeout: 1)
+        monitor.onPushToTalkReleased?()
+
+        XCTAssertEqual(eventLog.events.filter { $0 == "record start" }.count, 1)
+        XCTAssertEqual(eventLog.events.filter { $0 == "record stop" }.count, 1)
+        XCTAssertTrue(state.audioTestStatus.hasRecordingReady)
+        withExtendedLifetime(coordinator) {}
+    }
+
+    func testPushToTalkStartsAfterCompletedTranscriptAndClearsIt() async {
+        let eventLog = EventLog()
+        let recorder = FakeAudioRecorder(eventLog: eventLog)
+        let monitor = FakeAudioPasteLastMonitor()
+        let hud = FakeAudioHUD(eventLog: eventLog)
+        let recordingStarted = expectation(description: "recording restarted after transcript")
+        hud.onShowRecording = { recordingStarted.fulfill() }
+        let state = AppState(defaults: isolatedDefaults())
+        state.setAudioTestStatus(.transcribed(usedFallback: false))
+        state.setTestTranscript("synthetic prior transcript")
+        let coordinator = makeCoordinator(
+            state: state,
+            recorder: recorder,
+            playback: FakeAudioPlayback(eventLog: eventLog),
+            hud: hud,
+            monitor: monitor
+        )
+
+        monitor.onPushToTalkPressed?()
+        await fulfillment(of: [recordingStarted], timeout: 1)
+
+        XCTAssertTrue(recorder.isRecording)
+        XCTAssertNil(state.testTranscript)
+        monitor.onPushToTalkReleased?()
+        withExtendedLifetime(coordinator) {}
+    }
+
     func testStoppedTestRecordingExpiresAndDeletes() async {
         let eventLog = EventLog()
         let recorder = FakeAudioRecorder(eventLog: eventLog)
@@ -330,20 +432,22 @@ final class PhaseThreeAudioTests: XCTestCase {
         recorder: FakeAudioRecorder,
         playback: FakeAudioPlayback,
         hud: FakeAudioHUD,
-        speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService()
+        speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService(),
+        accessibility: FakeAudioAccessibility = FakeAudioAccessibility(),
+        monitor: FakeAudioPasteLastMonitor = FakeAudioPasteLastMonitor()
     ) -> AppCoordinator {
         AppCoordinator(
             state: state ?? AppState(defaults: isolatedDefaults()),
             apiKeyStore: FakeAudioAPIKeyStore(),
             launchAtLoginService: FakeAudioLaunchAtLogin(),
-            accessibility: FakeAudioAccessibility(),
+            accessibility: accessibility,
             microphonePermission: FakeAudioMicrophonePermission(),
             audioRecorder: recorder,
             audioPlayback: playback,
             speechToText: speechToText,
             pasteService: FakeAudioTextPaste(),
             lastDictationCache: FakeAudioCache(),
-            pasteLastMonitor: FakeAudioPasteLastMonitor(),
+            hotkeyMonitor: monitor,
             hud: hud
         )
     }
@@ -483,13 +587,19 @@ private final class FakeAudioLaunchAtLogin: LaunchAtLoginControlling {
 @MainActor
 private final class FakeAudioAccessibility: AccessibilityInspecting {
     var permissionStatus: AccessibilityPermissionStatus = .granted
+    private let secureFieldStatus: SecureFieldStatus
+
+    init(secureFieldStatus: SecureFieldStatus = .notSecure) {
+        self.secureFieldStatus = secureFieldStatus
+    }
+
     func requestPermission() {}
     func openSystemSettings() -> Bool { true }
     func captureTarget() -> PasteTarget {
         PasteTarget(
             bundleIdentifier: "com.example.target",
             processIdentifier: 1,
-            secureFieldStatus: .notSecure
+            secureFieldStatus: secureFieldStatus
         )
     }
 }
@@ -516,8 +626,10 @@ private final class FakeAudioCache: LastDictationCaching {
 }
 
 @MainActor
-private final class FakeAudioPasteLastMonitor: PasteLastHotkeyMonitoring {
+private final class FakeAudioPasteLastMonitor: HotkeyMonitoring {
     var isRunning = false
+    var onPushToTalkPressed: (() -> Void)?
+    var onPushToTalkReleased: (() -> Void)?
     var onPasteLast: (() -> Void)?
     func start() throws { isRunning = true }
     func stop() { isRunning = false }

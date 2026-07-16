@@ -39,7 +39,7 @@ final class PhaseOneAppShellTests: XCTestCase {
             audioPlayback: FakeAudioPlayback(),
             pasteService: FakeTextPasteService(),
             lastDictationCache: FakeLastDictationCache(),
-            pasteLastMonitor: FakePasteLastHotkeyMonitor(),
+            hotkeyMonitor: FakePasteLastHotkeyMonitor(),
             hud: hud
         )
 
@@ -94,7 +94,7 @@ final class PhaseOneAppShellTests: XCTestCase {
             .clipboardWriteFailed,
             .pasteEventCreationFailed,
             .pasteFailed,
-            .pasteLastMonitorFailed,
+            .hotkeyMonitorFailed,
             .microphonePermissionRequired,
             .microphonePermissionRestricted,
             .microphoneSettingsUnavailable,
@@ -161,8 +161,10 @@ private final class FakeLastDictationCache: LastDictationCaching {
 }
 
 @MainActor
-private final class FakePasteLastHotkeyMonitor: PasteLastHotkeyMonitoring {
+private final class FakePasteLastHotkeyMonitor: HotkeyMonitoring {
     private(set) var isRunning = false
+    var onPushToTalkPressed: (() -> Void)?
+    var onPushToTalkReleased: (() -> Void)?
     var onPasteLast: (() -> Void)?
 
     func start() throws { isRunning = true }

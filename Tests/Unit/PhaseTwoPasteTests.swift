@@ -206,7 +206,7 @@ final class PhaseTwoPasteTests: XCTestCase {
             audioPlayback: FakeAudioPlayback(),
             pasteService: FakeTextPasteService(),
             lastDictationCache: cache,
-            pasteLastMonitor: monitor,
+            hotkeyMonitor: monitor,
             hud: FakeHUD()
         )
     }
@@ -305,8 +305,10 @@ private final class FakeCache: LastDictationCaching {
 }
 
 @MainActor
-private final class FakePasteLastMonitor: PasteLastHotkeyMonitoring {
+private final class FakePasteLastMonitor: HotkeyMonitoring {
     private(set) var isRunning = false
+    var onPushToTalkPressed: (() -> Void)?
+    var onPushToTalkReleased: (() -> Void)?
     var onPasteLast: (() -> Void)?
 
     func start() throws { isRunning = true }

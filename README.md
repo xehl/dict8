@@ -6,7 +6,7 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-Phase 6 adds the pinned-model cleanup adapter, conservative output validation, and unchanged raw-transcript fallback. The deterministic and paid live cleanup corpora passed, including prompt-injection and legitimate meta-language cases. Global push-to-talk arrives in Phase 7.
+Phase 7 implements the real global `Control + Option` hold interaction through one balanced event-tap router shared with Paste Last. It captures the originating target, refuses known secure fields before recording, guards rapid or repeated modifier transitions, and leaves the stopped audio ready for explicit validation. Automatic transcription, cleanup, and paste arrive in Phase 8.
 
 - Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)
@@ -17,6 +17,7 @@ Phase 6 adds the pinned-model cleanup adapter, conservative output validation, a
 - Phase 4 validation and manual checks: [docs/PHASE_FOUR_VALIDATION.md](docs/PHASE_FOUR_VALIDATION.md)
 - Phase 5 validation and manual checks: [docs/PHASE_FIVE_VALIDATION.md](docs/PHASE_FIVE_VALIDATION.md)
 - Phase 6 validation and manual checks: [docs/PHASE_SIX_VALIDATION.md](docs/PHASE_SIX_VALIDATION.md)
+- Phase 7 validation and manual checks: [docs/PHASE_SEVEN_VALIDATION.md](docs/PHASE_SEVEN_VALIDATION.md)
 - Verified OpenRouter contracts and candidate models: [docs/OPENROUTER_CONTRACTS.md](docs/OPENROUTER_CONTRACTS.md)
 - Privacy and logging rules: [docs/PRIVACY_AND_LOGGING.md](docs/PRIVACY_AND_LOGGING.md)
 

@@ -71,6 +71,20 @@ enum LaunchAtLoginStatus: Equatable, Sendable {
     }
 }
 
+enum HotkeyMonitorStatus: Equatable, Sendable {
+    case stopped
+    case running
+    case unavailable
+
+    var displayName: String {
+        switch self {
+        case .stopped: "Stopped"
+        case .running: "Running"
+        case .unavailable: "Unavailable"
+        }
+    }
+}
+
 enum TestPasteStatus: Equatable, Sendable {
     case idle
     case armed
@@ -240,7 +254,7 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
     case clipboardWriteFailed
     case pasteEventCreationFailed
     case pasteFailed
-    case pasteLastMonitorFailed
+    case hotkeyMonitorFailed
     case microphonePermissionRequired
     case microphonePermissionRestricted
     case microphoneSettingsUnavailable
@@ -279,8 +293,8 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "The text was copied, but dict8 could not create the paste event."
         case .pasteFailed:
             "dict8 could not complete the paste."
-        case .pasteLastMonitorFailed:
-            "dict8 could not start the Paste Last shortcut monitor."
+        case .hotkeyMonitorFailed:
+            "dict8 could not start the global shortcut monitor."
         case .microphonePermissionRequired:
             "Microphone permission is required to record dictation."
         case .microphonePermissionRestricted:
@@ -335,6 +349,7 @@ final class AppState: ObservableObject {
     @Published private(set) var apiKeyStatus: APIKeyStatus = .checking
     @Published private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .notRegistered
     @Published private(set) var accessibilityStatus: AccessibilityPermissionStatus = .checking
+    @Published private(set) var hotkeyMonitorStatus: HotkeyMonitorStatus = .stopped
     @Published private(set) var microphonePermissionStatus: MicrophonePermissionStatus = .checking
     @Published private(set) var testPasteStatus: TestPasteStatus = .idle
     @Published private(set) var audioTestStatus: AudioTestStatus = .idle
@@ -389,6 +404,10 @@ final class AppState: ObservableObject {
 
     func setAccessibilityStatus(_ status: AccessibilityPermissionStatus) {
         accessibilityStatus = status
+    }
+
+    func setHotkeyMonitorStatus(_ status: HotkeyMonitorStatus) {
+        hotkeyMonitorStatus = status
     }
 
     func setMicrophonePermissionStatus(_ status: MicrophonePermissionStatus) {

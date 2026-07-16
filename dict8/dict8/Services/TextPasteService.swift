@@ -96,7 +96,7 @@ final class SystemPlainTextClipboard: PlainTextClipboardWriting {
 
 @MainActor
 final class SystemPasteEventPoster: PasteEventPosting {
-    static let syntheticEventMarker: Int64 = 0xD1C8
+    nonisolated static let syntheticEventMarker: Int64 = 0xD1C8
 
     func postPaste() async throws {
         try await Task.sleep(for: .milliseconds(40))

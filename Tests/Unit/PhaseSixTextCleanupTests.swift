@@ -276,7 +276,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             textCleanup: cleanup,
             pasteService: CleanupPasteService(),
             lastDictationCache: CleanupCache(),
-            pasteLastMonitor: CleanupPasteMonitor(),
+            hotkeyMonitor: CleanupPasteMonitor(),
             hud: CleanupHUD()
         )
     }
@@ -370,8 +370,10 @@ private actor CleanupAPIKeyStore: APIKeyStoring {
     func clear() {}
 }
 
-@MainActor private final class CleanupPasteMonitor: PasteLastHotkeyMonitoring {
+@MainActor private final class CleanupPasteMonitor: HotkeyMonitoring {
     var isRunning = false
+    var onPushToTalkPressed: (() -> Void)?
+    var onPushToTalkReleased: (() -> Void)?
     var onPasteLast: (() -> Void)?
     func start() throws { isRunning = true }
     func stop() { isRunning = false }

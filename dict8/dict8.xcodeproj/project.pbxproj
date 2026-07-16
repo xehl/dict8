@@ -15,6 +15,7 @@
 		A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */; };
 		A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */; };
 		A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */; };
+		A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +38,7 @@
 		A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFourOpenRouterTransportTests.swift; path = ../Tests/Unit/PhaseFourOpenRouterTransportTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseFiveSpeechToTextTests.swift; path = ../Tests/Unit/PhaseFiveSpeechToTextTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSixTextCleanupTests.swift; path = ../Tests/Unit/PhaseSixTextCleanupTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSevenHotkeyTests.swift; path = ../Tests/Unit/PhaseSevenHotkeyTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -76,6 +78,7 @@
 				A00000000000000000000018 /* PhaseFourOpenRouterTransportTests.swift */,
 				A0000000000000000000001A /* PhaseFiveSpeechToTextTests.swift */,
 				A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */,
+				A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				A00000000000000000000017 /* PhaseFourOpenRouterTransportTests.swift in Sources */,
 				A00000000000000000000019 /* PhaseFiveSpeechToTextTests.swift in Sources */,
 				A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */,
+				A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
