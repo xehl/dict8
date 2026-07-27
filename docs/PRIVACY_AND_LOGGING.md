@@ -26,9 +26,17 @@ These rules apply from the first implementation phase.
 
 - Store recordings only in an app-owned temporary directory.
 - Delete them on success, failure, cancellation, Disable, and quit where practical.
-- Sweep stale app-owned temporary files at startup.
+- At startup, sweep only regular `.m4a` files older than 15 minutes in the shallow app-owned `dict8-recordings` temporary directory; retry deletion once and leave all other files untouched.
 - Keep raw and cleaned text in the narrowest practical scope.
 - The sole exception is one last successful output held in process memory for at most ten minutes for Paste Last Dictation.
+
+## Persisted metrics
+
+- Store one versioned `UserDefaults` snapshot containing aggregate request/success/failure counts, total audio seconds, latency totals and counts, provider-reported cost totals, raw-cleanup-fallback count, and one stable issue-category enum.
+- Derive cancellations from aggregate counts; do not persist request identifiers or timelines.
+- Never persist transcript excerpts, clipboard contents, prompts, response bodies, target application identifiers, audio paths, raw error text, or authorization data in metrics.
+- Treat displayed costs as partial when OpenRouter omits usage metadata.
+- If the snapshot cannot be decoded or fails validation, remove only the metrics key, retain unrelated settings, and surface a non-blocking reset status.
 
 ## Remote processing
 

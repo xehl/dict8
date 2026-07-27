@@ -17,6 +17,7 @@
 		A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */; };
 		A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */; };
 		A0000000000000000000001F /* PhaseEightPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* PhaseEightPipelineTests.swift */; };
+		A00000000000000000000021 /* PhaseNineHardeningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* PhaseNineHardeningTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +42,7 @@
 		A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSixTextCleanupTests.swift; path = ../Tests/Unit/PhaseSixTextCleanupTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseSevenHotkeyTests.swift; path = ../Tests/Unit/PhaseSevenHotkeyTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000020 /* PhaseEightPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseEightPipelineTests.swift; path = ../Tests/Unit/PhaseEightPipelineTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000022 /* PhaseNineHardeningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhaseNineHardeningTests.swift; path = ../Tests/Unit/PhaseNineHardeningTests.swift; sourceTree = "<group>"; };
 		BEDDA7373001383800254AAC /* dict8.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dict8.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -82,6 +84,7 @@
 				A0000000000000000000001C /* PhaseSixTextCleanupTests.swift */,
 				A0000000000000000000001E /* PhaseSevenHotkeyTests.swift */,
 				A00000000000000000000020 /* PhaseEightPipelineTests.swift */,
+				A00000000000000000000022 /* PhaseNineHardeningTests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -228,6 +231,7 @@
 				A0000000000000000000001B /* PhaseSixTextCleanupTests.swift in Sources */,
 				A0000000000000000000001D /* PhaseSevenHotkeyTests.swift in Sources */,
 				A0000000000000000000001F /* PhaseEightPipelineTests.swift in Sources */,
+				A00000000000000000000021 /* PhaseNineHardeningTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -428,7 +432,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xehl.dict8;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -470,7 +474,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xehl.dict8;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

@@ -92,6 +92,22 @@ enum HotkeyMonitorStatus: Equatable, Sendable {
     }
 }
 
+enum TemporaryAudioMaintenanceStatus: Equatable, Sendable {
+    case pending
+    case clean
+    case removed(Int)
+    case failed
+
+    var displayName: String {
+        switch self {
+        case .pending: "Checking"
+        case .clean: "No stale recordings"
+        case let .removed(count): "Removed \(count) stale recording\(count == 1 ? "" : "s")"
+        case .failed: "Cleanup failed"
+        }
+    }
+}
+
 enum TestPasteStatus: Equatable, Sendable {
     case idle
     case armed
@@ -381,6 +397,9 @@ final class AppState: ObservableObject {
     @Published private(set) var cleanupTestInput = ""
     @Published private(set) var cleanupTestOutput: String?
     @Published private(set) var cleanupTestMetadata: CleanupTestMetadata?
+    @Published private(set) var usageMetrics = UsageMetricsSnapshot()
+    @Published private(set) var metricsStatus: MetricsStoreStatus = .available
+    @Published private(set) var temporaryAudioMaintenanceStatus: TemporaryAudioMaintenanceStatus = .pending
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -466,6 +485,18 @@ final class AppState: ObservableObject {
 
     func setCleanupTestMetadata(_ metadata: CleanupTestMetadata?) {
         cleanupTestMetadata = metadata
+    }
+
+    func setUsageMetrics(
+        _ metrics: UsageMetricsSnapshot,
+        status: MetricsStoreStatus
+    ) {
+        usageMetrics = metrics
+        metricsStatus = status
+    }
+
+    func setTemporaryAudioMaintenanceStatus(_ status: TemporaryAudioMaintenanceStatus) {
+        temporaryAudioMaintenanceStatus = status
     }
 
     func setStatus(_ status: AppStatus) {

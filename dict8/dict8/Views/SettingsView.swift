@@ -303,6 +303,60 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Usage metrics") {
+                let metrics = appState.usageMetrics
+                LabeledContent("Storage", value: appState.metricsStatus.displayName)
+                LabeledContent("Dictation requests", value: metrics.requestCount.formatted())
+                LabeledContent("Successful", value: metrics.successCount.formatted())
+                LabeledContent("Failed", value: metrics.failureCount.formatted())
+                LabeledContent("Cancelled", value: metrics.cancellationCount.formatted())
+                LabeledContent(
+                    "Audio minutes",
+                    value: metrics.audioMinutes.formatted(
+                        .number.precision(.fractionLength(2))
+                    )
+                )
+                LabeledContent(
+                    "Reported transcription cost",
+                    value: currency(metrics.totalTranscriptionCost)
+                )
+                LabeledContent(
+                    "Reported cleanup cost",
+                    value: currency(metrics.totalCleanupCost)
+                )
+                LabeledContent(
+                    "Reported total cost",
+                    value: currency(metrics.totalReportedCost)
+                )
+                LabeledContent(
+                    "Average transcription latency",
+                    value: latency(metrics.averageTranscriptionLatencySeconds)
+                )
+                LabeledContent(
+                    "Average cleanup latency",
+                    value: latency(metrics.averageCleanupLatencySeconds)
+                )
+                LabeledContent(
+                    "Average end-to-end latency",
+                    value: latency(metrics.averagePipelineLatencySeconds)
+                )
+                LabeledContent(
+                    "Raw cleanup fallbacks",
+                    value: metrics.cleanupFallbackCount.formatted()
+                )
+                LabeledContent(
+                    "Last issue",
+                    value: metrics.lastIssueCategory?.displayName ?? "None"
+                )
+                LabeledContent(
+                    "Startup audio cleanup",
+                    value: appState.temporaryAudioMaintenanceStatus.displayName
+                )
+
+                Text("Metrics are aggregate and content-free. Reported cost may be partial when OpenRouter omits usage metadata.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Startup") {
                 Toggle(
                     "Launch at Login",
@@ -354,5 +408,14 @@ struct SettingsView: View {
             apiKey = ""
             coordinator.closeSettingsValidation()
         }
+    }
+
+    private func currency(_ value: Double) -> String {
+        "$" + value.formatted(.number.precision(.fractionLength(6)))
+    }
+
+    private func latency(_ value: Double?) -> String {
+        guard let value else { return "Not available" }
+        return value.formatted(.number.precision(.fractionLength(3))) + " s"
     }
 }

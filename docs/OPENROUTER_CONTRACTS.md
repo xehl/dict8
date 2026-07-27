@@ -1,6 +1,6 @@
 # OpenRouter Contracts — Phase 0
 
-Verified against official OpenRouter documentation, OpenAPI schema, and the public Models API on 2026-07-14. Re-verify before implementing Phase 6 because schemas, models, endpoints, prices, and privacy routes can change.
+Verified against official OpenRouter documentation, the public Models API, and the live ZDR endpoint catalog on 2026-07-16. Re-verify before changing either pipeline because schemas, models, endpoints, prices, and privacy routes can change.
 
 ## Speech-to-text
 
@@ -42,7 +42,7 @@ Every request must include `provider.zdr: true`. This restricts routing to endpo
 OpenRouter may use its default provider fallback among ZDR-compatible endpoints for the one requested model. dict8 does not need to send `allow_fallbacks`, and must not send the `models` or `route` fields for automatic multi-model routing. Instead, dict8 owns the configured second-model attempt and can report when the pinned model failed. The transcription OpenAPI schema currently describes `provider` as a passthrough object rather than the full chat `ProviderPreferences` schema; the Phase 0 live benchmark verified that per-request `provider.zdr: true` is honored by the transcription endpoint.
 
 - [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr)
-- Public discovery query: `GET /api/v1/models?zdr=true`
+- Current ZDR endpoint catalog: `GET /api/v1/endpoints/zdr`
 - STT discovery query used: `GET /api/v1/models?output_modalities=transcription&zdr=true`
 
 ## Selected model configuration
@@ -53,6 +53,8 @@ OpenRouter may use its default provider fallback among ZDR-compatible endpoints 
 | Cleanup | `google/gemini-2.5-flash-lite` | `anthropic/claude-haiku-4.5` | Both appeared in the current ZDR query and advertise temperature support; selection favors low latency/cost with a different-provider fallback. |
 
 These are explicit candidates, not quality claims. The cleanup corpus and manual live tests must validate behavior before v0 readiness.
+
+On 2026-07-16, both STT identifiers remained in the filtered transcription catalog with `audio -> transcription` modality, and both cleanup identifiers remained in the general catalog with text output and temperature support. The live ZDR endpoint catalog listed at least one route for every configured identifier: Groq and Together for Whisper, Google for Chirp and Gemini Flash Lite, and Amazon Bedrock and Google for Claude Haiku. This is a point-in-time availability check; every runtime request still sets `provider.zdr: true` and fails closed if no qualifying route is available.
 
 ## Errors and attempt policy
 

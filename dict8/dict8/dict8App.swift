@@ -17,6 +17,7 @@ struct Dict8App: App {
         let openRouter = OpenRouterClient(apiKeyStore: apiKeyStore)
         let speechToText = OpenRouterSpeechToTextService(transport: openRouter)
         let textCleanup = OpenRouterTextCleanupService(transport: openRouter)
+        let metricsStore = SystemUsageMetricsStore()
         let coordinator = AppCoordinator(
             state: state,
             apiKeyStore: apiKeyStore,
@@ -30,7 +31,9 @@ struct Dict8App: App {
             pasteService: pasteService,
             lastDictationCache: LastDictationCache(),
             hotkeyMonitor: SystemHotkeyMonitor(),
-            hud: RecordingHUDController()
+            hud: RecordingHUDController(),
+            metricsStore: metricsStore,
+            temporaryAudioMaintenance: SystemTemporaryAudioMaintenance()
         )
         _appState = StateObject(wrappedValue: state)
         self.coordinator = coordinator

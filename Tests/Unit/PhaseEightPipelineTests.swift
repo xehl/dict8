@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -15,6 +16,10 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertEqual(harness.cache.value(), "Cleaned synthetic transcript.")
         XCTAssertEqual(harness.recorder.deleteCount, 1)
         XCTAssertNil(harness.state.lastError)
+        XCTAssertEqual(harness.metrics.snapshot.requestCount, 1)
+        XCTAssertEqual(harness.metrics.snapshot.successCount, 1)
+        XCTAssertEqual(harness.metrics.snapshot.totalTranscriptionCost, 0.003)
+        XCTAssertEqual(harness.metrics.snapshot.totalCleanupCost, 0.000_02)
         let timing = try? XCTUnwrap(harness.timing.value)
         XCTAssertNotNil(timing?.transcription)
         XCTAssertNotNil(timing?.cleanup)
@@ -36,6 +41,7 @@ final class PhaseEightPipelineTests: XCTestCase {
         )
         XCTAssertTrue(harness.hud.feedback.contains(.cleanupRawFallback))
         XCTAssertEqual(harness.recorder.deleteCount, 1)
+        XCTAssertEqual(harness.metrics.snapshot.cleanupFallbackCount, 1)
     }
 
     func testTranscriptionFailureDeletesAudioWithoutCleanupPasteOrCache() async {
@@ -50,6 +56,7 @@ final class PhaseEightPipelineTests: XCTestCase {
         let cleanupCalls = await harness.cleanup.callCount()
         XCTAssertEqual(cleanupCalls, 0)
         XCTAssertEqual(harness.recorder.deleteCount, 1)
+        XCTAssertEqual(harness.metrics.snapshot.failureCount, 1)
     }
 
     func testTranscriptionAndDeletionFailureReportsCombinedSanitizedError() async {
@@ -67,6 +74,7 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertEqual(harness.recorder.deleteCount, 2)
         XCTAssertTrue(harness.paste.texts.isEmpty)
         XCTAssertNil(harness.cache.value())
+        XCTAssertEqual(harness.metrics.snapshot.failureCount, 1)
     }
 
     func testFocusChangeCopiesCachesAndWarns() async {
@@ -77,6 +85,7 @@ final class PhaseEightPipelineTests: XCTestCase {
 
         XCTAssertEqual(harness.cache.value(), "Cleaned synthetic transcript.")
         XCTAssertTrue(harness.hud.feedback.contains(.copiedBecauseFocusChanged))
+        XCTAssertEqual(harness.metrics.snapshot.successCount, 1)
     }
 
     func testPasteEventFailureCachesClipboardTextAndReportsError() async {
@@ -87,6 +96,7 @@ final class PhaseEightPipelineTests: XCTestCase {
 
         XCTAssertEqual(harness.cache.value(), "Cleaned synthetic transcript.")
         XCTAssertEqual(harness.paste.texts, ["Cleaned synthetic transcript."])
+        XCTAssertEqual(harness.metrics.snapshot.successCount, 1)
     }
 
     func testClipboardFailureDoesNotSeedCache() async {
@@ -96,6 +106,7 @@ final class PhaseEightPipelineTests: XCTestCase {
         await waitUntil { harness.state.lastError == .clipboardWriteFailed }
 
         XCTAssertNil(harness.cache.value())
+        XCTAssertEqual(harness.metrics.snapshot.failureCount, 1)
     }
 
     func testAudioDeletionFailureRetriesAndStillPastes() async {
@@ -143,6 +154,53 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertTrue(harness.paste.texts.isEmpty)
         XCTAssertEqual(harness.state.status, .disabled)
         XCTAssertNil(harness.cache.value())
+        XCTAssertEqual(harness.metrics.snapshot.requestCount, 1)
+        XCTAssertEqual(harness.metrics.snapshot.successCount, 0)
+        XCTAssertEqual(harness.metrics.snapshot.failureCount, 0)
+        XCTAssertEqual(harness.metrics.snapshot.cancellationCount, 1)
+    }
+
+    func testWorkspaceLifecycleNotificationsCancelPipelineAndClearCache() async {
+        let notifications = [
+            NSWorkspace.sessionDidResignActiveNotification,
+            NSWorkspace.screensDidSleepNotification,
+            NSWorkspace.willSleepNotification,
+        ]
+
+        for notification in notifications {
+            let harness = PipelineHarness(transcriptionDelay: .seconds(60))
+            harness.coordinator.startIfNeeded()
+
+            harness.monitor.onPushToTalkPressed?()
+            await waitUntil { harness.recorder.isRecording }
+            harness.monitor.onPushToTalkReleased?()
+            await waitUntil { harness.state.status == .transcribing }
+            harness.cache.store("synthetic cached result")
+
+            NSWorkspace.shared.notificationCenter.post(name: notification, object: nil)
+            await waitUntil { harness.recorder.deleteCount == 1 }
+
+            XCTAssertTrue(harness.paste.texts.isEmpty)
+            XCTAssertNil(harness.cache.value())
+            XCTAssertEqual(harness.metrics.snapshot.cancellationCount, 1)
+        }
+    }
+
+    func testPrepareForQuitCancelsPipelineDeletesAudioAndClearsCache() async {
+        let harness = PipelineHarness(transcriptionDelay: .seconds(60))
+
+        harness.monitor.onPushToTalkPressed?()
+        await waitUntil { harness.recorder.isRecording }
+        harness.monitor.onPushToTalkReleased?()
+        await waitUntil { harness.state.status == .transcribing }
+        harness.cache.store("synthetic cached result")
+
+        harness.coordinator.prepareForQuit()
+        await waitUntil { harness.recorder.deleteCount == 1 }
+
+        XCTAssertTrue(harness.paste.texts.isEmpty)
+        XCTAssertNil(harness.cache.value())
+        XCTAssertEqual(harness.metrics.snapshot.cancellationCount, 1)
     }
 
     func testAutomaticCutoffStartsPipelineOnceAndReleaseIsHarmless() async {
@@ -195,7 +253,13 @@ final class PhaseEightPipelineTests: XCTestCase {
             usedFallback: usedFallback,
             latency: .milliseconds(10),
             recordedDuration: 2,
-            usage: nil
+            usage: SpeechTranscriptionUsage(
+                audioSeconds: 2,
+                totalTokens: nil,
+                inputTokens: nil,
+                outputTokens: nil,
+                cost: 0.003
+            )
         )
     }
 
@@ -205,7 +269,12 @@ final class PhaseEightPipelineTests: XCTestCase {
             model: usedFallback ? "synthetic/cleanup-fallback" : "synthetic/cleanup-primary",
             usedFallback: usedFallback,
             latency: .milliseconds(10),
-            usage: nil
+            usage: TextCleanupUsage(
+                promptTokens: nil,
+                completionTokens: nil,
+                totalTokens: nil,
+                cost: 0.000_02
+            )
         )
     }
 }
@@ -222,6 +291,7 @@ private final class PipelineHarness {
     let monitor: PipelineMonitor
     let hud: PipelineHUD
     let timing: PipelineTimingCapture
+    let metrics: NoOpUsageMetricsStore
     let coordinator: AppCoordinator
 
     init(
@@ -252,6 +322,7 @@ private final class PipelineHarness {
         monitor = PipelineMonitor()
         hud = PipelineHUD()
         timing = PipelineTimingCapture()
+        metrics = NoOpUsageMetricsStore()
         coordinator = AppCoordinator(
             state: state,
             apiKeyStore: PipelineAPIKeyStore(),
@@ -268,7 +339,8 @@ private final class PipelineHarness {
             hud: hud,
             pipelineTimingHandler: { [timing] value in
                 timing.value = value
-            }
+            },
+            metricsStore: metrics
         )
     }
 }

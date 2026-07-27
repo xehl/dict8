@@ -30,6 +30,8 @@ final class AppCoordinator {
     private let hotkeyMonitor: any HotkeyMonitoring
     private let hud: any RecordingHUDPresenting
     private let pipelineTimingHandler: @MainActor (DictationPipelineTiming) -> Void
+    private let metricsStore: any UsageMetricsRecording
+    private let temporaryAudioMaintenance: any TemporaryAudioMaintaining
     private var keychainTask: Task<Void, Never>?
     private var pasteTask: Task<Void, Never>?
     private var microphonePermissionTask: Task<Void, Never>?
@@ -41,6 +43,7 @@ final class AppCoordinator {
     private var cleanupExpirationTask: Task<Void, Never>?
     private var pipelineTask: Task<Void, Never>?
     private var completionResetTask: Task<Void, Never>?
+    private var temporaryAudioMaintenanceTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
     private var recordingOriginatingTarget: PasteTarget?
     private var productionRecording: (generation: Int, file: RecordedAudioFile)?
@@ -65,7 +68,9 @@ final class AppCoordinator {
         lastDictationCache: any LastDictationCaching,
         hotkeyMonitor: any HotkeyMonitoring,
         hud: any RecordingHUDPresenting,
-        pipelineTimingHandler: @escaping @MainActor (DictationPipelineTiming) -> Void = { _ in }
+        pipelineTimingHandler: @escaping @MainActor (DictationPipelineTiming) -> Void = { _ in },
+        metricsStore: any UsageMetricsRecording = NoOpUsageMetricsStore(),
+        temporaryAudioMaintenance: any TemporaryAudioMaintaining = NoOpTemporaryAudioMaintenance()
     ) {
         self.state = state
         self.apiKeyStore = apiKeyStore
@@ -81,6 +86,8 @@ final class AppCoordinator {
         self.hotkeyMonitor = hotkeyMonitor
         self.hud = hud
         self.pipelineTimingHandler = pipelineTimingHandler
+        self.metricsStore = metricsStore
+        self.temporaryAudioMaintenance = temporaryAudioMaintenance
 
         hotkeyMonitor.onPushToTalkPressed = { [weak self] in
             self?.pushToTalkPressed()
@@ -108,6 +115,7 @@ final class AppCoordinator {
         cleanupExpirationTask?.cancel()
         pipelineTask?.cancel()
         completionResetTask?.cancel()
+        temporaryAudioMaintenanceTask?.cancel()
     }
 
     func startIfNeeded() {
@@ -115,6 +123,7 @@ final class AppCoordinator {
         hasStarted = true
         installLifecycleObservers()
         refreshConfiguration()
+        sweepStaleTemporaryAudio()
     }
 
     func refreshConfiguration() {
@@ -122,6 +131,7 @@ final class AppCoordinator {
         refreshAccessibilityPermission()
         refreshMicrophonePermission()
         refreshAPIKeyStatus()
+        refreshUsageMetrics()
     }
 
     func setEnabled(_ isEnabled: Bool) {
@@ -648,6 +658,7 @@ final class AppCoordinator {
     func prepareForQuit() {
         keychainTask?.cancel()
         microphonePermissionTask?.cancel()
+        temporaryAudioMaintenanceTask?.cancel()
         cancelProductionPipeline()
         cancelAudioTest()
         cancelCleanupTest(clearInput: true)
@@ -776,6 +787,7 @@ final class AppCoordinator {
         state.setStatus(.encoding)
         state.clearError()
         productionRecording = (generation, recording)
+        recordMetricsStarted(audioSeconds: recording.duration)
 
         pipelineTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -798,6 +810,11 @@ final class AppCoordinator {
         var cleanupDuration: Duration?
         var pasteDuration: Duration?
         var audioNeedsDeletion = true
+        var metricOutcome: DictationMetricOutcome?
+        var metricIssue: DictationIssueCategory?
+        var transcriptionCost: Double?
+        var cleanupCost: Double?
+        var usedRawCleanupFallback = false
 
         defer {
             if audioNeedsDeletion,
@@ -805,14 +822,27 @@ final class AppCoordinator {
                 state.setWarning(.temporaryAudioCleanupFailed)
                 hud.showFeedback(.temporaryAudioCleanupFailed)
             }
-            pipelineTimingHandler(
-                DictationPipelineTiming(
-                    transcription: transcriptionDuration,
-                    cleanup: cleanupDuration,
-                    paste: pasteDuration,
-                    total: totalStart.duration(to: clock.now)
-                )
+            let timing = DictationPipelineTiming(
+                transcription: transcriptionDuration,
+                cleanup: cleanupDuration,
+                paste: pasteDuration,
+                total: totalStart.duration(to: clock.now)
             )
+            pipelineTimingHandler(timing)
+            if let metricOutcome {
+                recordMetricsCompletion(
+                    DictationMetricEvent(
+                        outcome: metricOutcome,
+                        transcriptionLatency: transcriptionDuration,
+                        cleanupLatency: cleanupDuration,
+                        totalLatency: timing.total,
+                        transcriptionCost: transcriptionCost,
+                        cleanupCost: cleanupCost,
+                        usedRawCleanupFallback: usedRawCleanupFallback,
+                        issueCategory: metricIssue
+                    )
+                )
+            }
             if pipelineGeneration == generation {
                 pipelineTask = nil
             }
@@ -858,6 +888,10 @@ final class AppCoordinator {
                     ? .transcriptionFailed(error)
                     : .transcriptionAndAudioCleanupFailed(error)
             )
+            metricOutcome = .failure
+            metricIssue = deleted
+                ? .transcriptionFailure
+                : .temporaryAudioCleanupFailure
             if !deleted {
                 hud.showFeedback(.temporaryAudioCleanupFailed)
             }
@@ -876,6 +910,10 @@ final class AppCoordinator {
                     ? .transcriptionFailed(failure)
                     : .transcriptionAndAudioCleanupFailed(failure)
             )
+            metricOutcome = .failure
+            metricIssue = deleted
+                ? .transcriptionFailure
+                : .temporaryAudioCleanupFailure
             if !deleted {
                 hud.showFeedback(.temporaryAudioCleanupFailed)
             }
@@ -885,6 +923,7 @@ final class AppCoordinator {
         if transcription.usedFallback {
             hud.showFeedback(.transcriptionFallbackUsed)
         }
+        transcriptionCost = transcription.usage?.cost
 
         let audioDeleted = deleteProductionRecording(recording, generation: generation)
         audioNeedsDeletion = false
@@ -903,6 +942,7 @@ final class AppCoordinator {
             try Task.checkCancellation()
             cleanupResult = result
             finalText = result.text
+            cleanupCost = result.usage?.cost
             if result.usedFallback {
                 hud.showFeedback(.cleanupFallbackUsed)
             }
@@ -917,6 +957,7 @@ final class AppCoordinator {
                 return
             }
             cleanupFailure = error
+            usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
         } catch {
             cleanupDuration = cleanupStart.duration(to: clock.now)
@@ -925,6 +966,7 @@ final class AppCoordinator {
                 return
             }
             cleanupFailure = .transport(.networkFailure)
+            usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
         }
 
@@ -948,6 +990,8 @@ final class AppCoordinator {
                 return
             }
             state.setError(appError(for: error))
+            metricOutcome = error == .eventCreationFailed ? .success : .failure
+            metricIssue = audioDeleted ? .pasteFailure : .temporaryAudioCleanupFailure
             return
         } catch {
             pasteDuration = pasteStart.duration(to: clock.now)
@@ -956,6 +1000,8 @@ final class AppCoordinator {
                 return
             }
             state.setError(.pasteFailed)
+            metricOutcome = .failure
+            metricIssue = audioDeleted ? .pasteFailure : .temporaryAudioCleanupFailure
             return
         }
 
@@ -986,6 +1032,8 @@ final class AppCoordinator {
             state.clearError()
             scheduleCompletedStatusReset(generation: generation)
         }
+        metricOutcome = .success
+        metricIssue = warning.flatMap(metricIssueCategory(for:))
     }
 
     private func pasteProductionText(
@@ -1390,6 +1438,72 @@ final class AppCoordinator {
         } catch {
             state.setHotkeyMonitorStatus(.unavailable)
             state.setError(.hotkeyMonitorFailed)
+        }
+    }
+
+    private func refreshUsageMetrics() {
+        state.setUsageMetrics(metricsStore.snapshot, status: metricsStore.status)
+    }
+
+    private func recordMetricsStarted(audioSeconds: Double) {
+        do {
+            let snapshot = try metricsStore.recordStarted(audioSeconds: audioSeconds)
+            state.setUsageMetrics(snapshot, status: metricsStore.status)
+        } catch {
+            state.setUsageMetrics(metricsStore.snapshot, status: .persistenceFailed)
+        }
+    }
+
+    private func recordMetricsCompletion(_ event: DictationMetricEvent) {
+        do {
+            let snapshot = try metricsStore.recordCompletion(event)
+            state.setUsageMetrics(snapshot, status: metricsStore.status)
+        } catch {
+            state.setUsageMetrics(metricsStore.snapshot, status: .persistenceFailed)
+        }
+    }
+
+    private func metricIssueCategory(for warning: AppShellError) -> DictationIssueCategory? {
+        switch warning {
+        case .temporaryAudioCleanupFailed, .transcriptionAndAudioCleanupFailed:
+            .temporaryAudioCleanupFailure
+        case .focusChangedCopied:
+            .focusChanged
+        case .cleanupFailed:
+            .cleanupRawFallback
+        case .cleanupFallbackUsed:
+            .cleanupModelFallback
+        case .transcriptionFallbackUsed:
+            .transcriptionFallback
+        case .recordingCueFailed:
+            .recordingCueFailure
+        default:
+            nil
+        }
+    }
+
+    private func sweepStaleTemporaryAudio() {
+        temporaryAudioMaintenanceTask?.cancel()
+        state.setTemporaryAudioMaintenanceStatus(.pending)
+        let cutoff = Date().addingTimeInterval(
+            -SystemTemporaryAudioMaintenance.v0StaleRecordingAge
+        )
+        temporaryAudioMaintenanceTask = Task { @MainActor [weak self, temporaryAudioMaintenance] in
+            guard let self else { return }
+            do {
+                let removedCount = try await temporaryAudioMaintenance
+                    .sweepStaleRecordings(olderThan: cutoff)
+                guard !Task.isCancelled else { return }
+                self.state.setTemporaryAudioMaintenanceStatus(
+                    removedCount == 0 ? .clean : .removed(removedCount)
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.state.setTemporaryAudioMaintenanceStatus(.failed)
+            }
+            self.temporaryAudioMaintenanceTask = nil
         }
     }
 

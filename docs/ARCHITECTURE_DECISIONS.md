@@ -111,3 +111,13 @@ Each production recording is owned by one coordinator task after `AudioRecording
 Temporary audio deletion receives one immediate retry. After successful STT, a persistent content-free deletion warning does not block delivery of the resulting text. If STT and deletion both fail, show a combined sanitized error. Cache the final text only after it reaches the clipboard: successful paste, focus-change copy, or paste-event failure after clipboard write. Never cache after STT failure, secure refusal, clipboard-write failure, or cancellation.
 
 Provider fallback, raw cleanup fallback, focus-copy, cue failure, and temporary-file failure use content-free feedback. Operation-local transcription, cleanup, paste, and total durations are emitted only to an in-memory callback in Phase 8; Phase 9 owns aggregate persistence and Settings metrics.
+
+## ADR-017 — Aggregate metrics and abnormal-exit cleanup
+
+**Status:** Implemented for Phase 9; signed manual validation pending
+
+Persist one versioned, typed `UserDefaults` snapshot containing only counts, durations, provider-reported costs, stage totals, and one stable content-free issue category. Count a request when a stopped production recording enters the pipeline. Count success once final text reaches the clipboard, including focus-change copy and a synthetic-paste event failure after a successful clipboard write; count failure when no final text reaches the clipboard. Derive cancellation as requests minus successes and failures so an interrupted or abnormally terminated request needs no separate write. Cost totals are explicitly partial when OpenRouter omits metadata. Invalid persisted data resets only the metrics key and surfaces a non-blocking storage status.
+
+At launch, inspect only the shallow app-owned `dict8-recordings` temporary directory. Delete regular `.m4a` files whose modification time is more than 15 minutes old, retrying a failed deletion once. Do not traverse subdirectories or delete other extensions. This sweep limits abnormal-exit residue without treating the temporary directory as general application storage.
+
+The local v0 candidate is marketing version `0.1.0`, build `1`. Personal Team signing, App Sandbox disabled, and Hardened Runtime remain unchanged. Notarization, releases, tags, and a single-instance lock are out of scope; do not run an Xcode build and an installed `/Applications` copy simultaneously.

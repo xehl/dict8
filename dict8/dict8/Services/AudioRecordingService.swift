@@ -1,6 +1,86 @@
 import AVFoundation
 import Foundation
 
+nonisolated enum TemporaryAudioMaintenanceError: Error, Equatable, Sendable {
+    case cleanupFailed
+}
+
+nonisolated protocol TemporaryAudioMaintaining: Sendable {
+    func sweepStaleRecordings(olderThan cutoff: Date) async throws -> Int
+}
+
+actor SystemTemporaryAudioMaintenance: TemporaryAudioMaintaining {
+    nonisolated static let v0StaleRecordingAge: TimeInterval = 15 * 60
+
+    private let fileManager: FileManager
+    private let temporaryRoot: URL
+
+    init(
+        fileManager: FileManager = .default,
+        temporaryRoot: URL? = nil
+    ) {
+        self.fileManager = fileManager
+        self.temporaryRoot = temporaryRoot ?? fileManager.temporaryDirectory
+    }
+
+    func sweepStaleRecordings(olderThan cutoff: Date) async throws -> Int {
+        let directory = temporaryRoot.appending(
+            component: "dict8-recordings",
+            directoryHint: .isDirectory
+        )
+        guard fileManager.fileExists(atPath: directory.path) else { return 0 }
+
+        let candidates: [URL]
+        do {
+            candidates = try fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [
+                    .contentModificationDateKey,
+                    .isRegularFileKey,
+                ],
+                options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+            )
+        } catch {
+            throw TemporaryAudioMaintenanceError.cleanupFailed
+        }
+
+        var removedCount = 0
+        for candidate in candidates where candidate.pathExtension.lowercased() == "m4a" {
+            let values: URLResourceValues
+            do {
+                values = try candidate.resourceValues(
+                    forKeys: [.contentModificationDateKey, .isRegularFileKey]
+                )
+            } catch {
+                throw TemporaryAudioMaintenanceError.cleanupFailed
+            }
+            guard values.isRegularFile == true,
+                  let modifiedAt = values.contentModificationDate,
+                  modifiedAt < cutoff else { continue }
+
+            var removed = false
+            for _ in 0..<2 {
+                do {
+                    try fileManager.removeItem(at: candidate)
+                    removed = true
+                    removedCount += 1
+                    break
+                } catch {
+                    continue
+                }
+            }
+            if !removed {
+                throw TemporaryAudioMaintenanceError.cleanupFailed
+            }
+        }
+        return removedCount
+    }
+}
+
+nonisolated struct NoOpTemporaryAudioMaintenance: TemporaryAudioMaintaining {
+    func sweepStaleRecordings(olderThan cutoff: Date) async throws -> Int { 0 }
+}
+
 enum AudioRecordingError: Error, Equatable, Sendable {
     case microphonePermissionRequired
     case alreadyRecording
