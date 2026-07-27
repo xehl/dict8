@@ -6,7 +6,7 @@ The intended cleanup style is: **“Me but punctuated.”**
 
 ## Current status
 
-Phase 9 adds versioned content-free usage metrics, stale temporary-audio cleanup, lifecycle regression coverage, and the local v0 release checklist. Automated hardening checks pass; the signed manual compatibility and routine-use matrix is the remaining v0 gate.
+Personal v0 `0.1.0` build `1` was accepted for full-time use on 2026-07-27. The complete hold–speak–release–paste journey, content-free metrics, stale-audio cleanup, lifecycle handling, and primary compatibility targets have passed automated and signed manual validation. A noticeable roughly one-second responsiveness delay compared with Wispr is accepted for v0.
 
 - Authoritative product requirements and numbered phase plan: [PRD.md](PRD.md)
 - Architecture decisions to resolve before implementation: [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)

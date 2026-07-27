@@ -78,13 +78,13 @@ For each installed target, focus a blank normal text field, dictate one harmless
 
 | Target | Result | Content-free note |
 |---|---|---|
-| TextEdit | Pending | |
-| ChatGPT | Pending | |
-| Codex | Pending | |
-| Cursor | Pending | |
-| Claude | Pending | |
-| Safari text area | Pending | |
-| Chrome text area | Pending | |
+| TextEdit | Pass | Accepted during signed Phase 8 validation |
+| ChatGPT | Pass | Accepted during signed Phase 8 validation |
+| Codex | Pass | Accepted during signed Phase 8 validation |
+| Cursor | Pass | Accepted during signed Phase 8 validation |
+| Claude | Deferred | Not individually rerun for personal v0 acceptance |
+| Safari text area | Deferred | Not individually rerun for personal v0 acceptance |
+| Chrome text area | Deferred | Not individually rerun for personal v0 acceptance |
 
 For at least one target, switch to another app immediately after release. Confirm dict8 copies and notifies instead of pasting into the new app. Also verify a known password field refuses recording and leaves the clipboard unchanged.
 
@@ -114,4 +114,8 @@ Pass when production code contains no content-bearing logging, no secret is comm
 
 ## Acceptance record
 
-Pending owner completion of the signed manual matrix. Record only pass/fail, installed/not-installed status, approximate durations, aggregate metric behavior, and content-free limitations. Never paste transcript text, API keys, audio, screenshots containing dictated content, or clipboard contents into this file.
+Accepted by the owner for full-time personal use on 2026-07-27 using the signed local `0.1.0` build `1`. Routine dictation completed successfully. The owner observed a noticeable post-release responsiveness delay of roughly one second compared with Wispr and explicitly accepted it as a non-blocking expectation adjustment.
+
+Automated verification passed 91 tests, and the unsigned Release configuration built successfully before signed validation. Earlier signed validation covers TextEdit, ChatGPT, Codex, Cursor, representative speech longer than two minutes, the 180-second cutoff, sounds, HUD, fallback behavior, temporary-data deletion, target-change copying, secure-field refusal, and Paste Last. Claude, Safari, and Chrome were not individually rerun for this final acceptance and remain deferred compatibility checks rather than blockers for the owner's current workflow.
+
+No transcript text, API keys, audio, screenshots containing dictated content, or clipboard contents were retained in this acceptance record.

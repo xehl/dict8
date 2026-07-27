@@ -1,6 +1,6 @@
 # dict8 Product Requirements Document
 
-**Status:** Phase 9 implementation complete; v0 manual validation pending
+**Status:** Phase 9 complete; personal v0 accepted on 2026-07-27
 **Platform:** macOS 26.5 on Apple silicon  
 **Initial release:** v0, defined as the first routinely usable version  
 **Product type:** Personal menu bar utility for one user
@@ -508,6 +508,8 @@ Development starts at Phase 0 because no application implementation exists yet. 
 - Launch at Login, fallback notifications, sounds, and HUD pass routine-use testing
 
 **Implementation note:** Each stopped production recording increments one persisted request and its audio duration. A terminal success means the final text reached the clipboard; cancellation is derived as requests minus successes and failures. Provider-reported cost, stage latency, end-to-end latency, raw-cleanup-fallback count, and one stable content-free issue category are stored in a versioned `UserDefaults` snapshot. Invalid metrics reset only that snapshot. Startup removes only regular `.m4a` files older than 15 minutes from dict8's own temporary recording directory, with one deletion retry. Version `0.1.0` build `1` is the local personal v0 candidate; manual compatibility and routine-use checks remain required before declaring v0 done.
+
+**Acceptance note:** The owner accepted version `0.1.0` build `1` for full-time personal use on 2026-07-27 after signed routine-use dictation succeeded. A noticeable post-release responsiveness delay of roughly one second compared with Wispr was accepted as a non-blocking expectation adjustment. TextEdit, ChatGPT, Codex, and Cursor retain their earlier signed compatibility acceptance; Claude, Safari, and Chrome were not individually rerun for this acceptance and remain documented follow-up targets rather than blockers for the owner's current workflow.
 
 ## 10. Test strategy
 
