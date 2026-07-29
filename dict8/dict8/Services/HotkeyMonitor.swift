@@ -16,8 +16,27 @@ nonisolated enum HotkeyAction: Equatable, Sendable {
 nonisolated struct HotkeyDecision: Equatable, Sendable {
     let consume: Bool
     let actions: [HotkeyAction]
+    let stripPushToTalkModifiers: Bool
+
+    init(
+        consume: Bool,
+        actions: [HotkeyAction],
+        stripPushToTalkModifiers: Bool = false
+    ) {
+        self.consume = consume
+        self.actions = actions
+        self.stripPushToTalkModifiers = stripPushToTalkModifiers
+    }
 
     static let pass = HotkeyDecision(consume: false, actions: [])
+
+    func flagsForDelivery(_ flags: CGEventFlags) -> CGEventFlags {
+        guard stripPushToTalkModifiers else { return flags }
+        var deliveredFlags = flags
+        deliveredFlags.remove(.maskControl)
+        deliveredFlags.remove(.maskAlternate)
+        return deliveredFlags
+    }
 }
 
 nonisolated struct HotkeyStateMachine: Sendable {
@@ -86,7 +105,13 @@ nonisolated struct HotkeyStateMachine: Sendable {
             )
         }
 
-        return HotkeyDecision(consume: consume, actions: actions)
+        return HotkeyDecision(
+            consume: consume,
+            actions: actions,
+            stripPushToTalkModifiers: pushToTalkIsLatched
+                && !pushToTalkReleaseWasSent
+                && Self.isLeftMouseEvent(typeRawValue)
+        )
     }
 
     private mutating func processPushToTalk(
@@ -204,6 +229,17 @@ nonisolated struct HotkeyStateMachine: Sendable {
     private static func isControlOrOptionKeyCode(_ keyCode: Int64) -> Bool {
         controlKeyCodes.contains(keyCode) || optionKeyCodes.contains(keyCode)
     }
+
+    private static func isLeftMouseEvent(_ typeRawValue: UInt32) -> Bool {
+        switch typeRawValue {
+        case CGEventType.leftMouseDown.rawValue,
+             CGEventType.leftMouseUp.rawValue,
+             CGEventType.leftMouseDragged.rawValue:
+            true
+        default:
+            false
+        }
+    }
 }
 
 @MainActor
@@ -237,6 +273,9 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
             CGEventType.keyDown,
             CGEventType.keyUp,
             CGEventType.flagsChanged,
+            CGEventType.leftMouseDown,
+            CGEventType.leftMouseUp,
+            CGEventType.leftMouseDragged,
         ]
         let mask = interestedEvents.reduce(CGEventMask(0)) { partialResult, eventType in
             partialResult | CGEventMask(1 << eventType.rawValue)
@@ -281,7 +320,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
         keyCode: Int64,
         flagsRawValue: UInt64,
         marker: Int64
-    ) -> Bool {
+    ) -> HotkeyDecision {
         let decision = stateMachine.process(
             typeRawValue: typeRawValue,
             keyCode: keyCode,
@@ -289,7 +328,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
             marker: marker
         )
         deliver(decision.actions)
-        return decision.consume
+        return decision
     }
 
     private func handleInterruption() {
@@ -326,7 +365,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flagsRawValue = event.flags.rawValue
         let marker = event.getIntegerValueField(.eventSourceUserData)
-        let shouldConsume = MainActor.assumeIsolated {
+        let decision = MainActor.assumeIsolated {
             monitor.handle(
                 typeRawValue: type.rawValue,
                 keyCode: keyCode,
@@ -334,6 +373,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
                 marker: marker
             )
         }
-        return shouldConsume ? nil : Unmanaged.passUnretained(event)
+        event.flags = decision.flagsForDelivery(event.flags)
+        return decision.consume ? nil : Unmanaged.passUnretained(event)
     }
 }

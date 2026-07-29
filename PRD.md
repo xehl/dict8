@@ -106,6 +106,7 @@ Latency targets are directional because network and model latency vary; they are
 - Disabling or quitting removes listeners and cancels in-flight work safely.
 - Reaching 180 seconds stops recording and begins processing without losing the recording.
 - The shortcut is consumed while dict8 is enabled so it does not affect the foreground application.
+- While push-to-talk owns the chord, left-button down, up, and drag events behave like ordinary unmodified mouse actions so the user can refocus or reposition without opening a Control-click menu. Right-click, scrolling, and mouse behavior outside the active chord remain unchanged.
 - The hotkey service is abstracted so a future configurable shortcut or hardware input does not change pipeline orchestration.
 
 ### 6.2 Recording

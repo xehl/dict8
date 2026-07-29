@@ -162,6 +162,73 @@ final class PhaseSevenHotkeyTests: XCTestCase {
         XCTAssertEqual(key(&machine, .keyDown, 0, [.maskControl, .maskAlternate]), .pass)
     }
 
+    func testLeftMouseEventsStripChordModifiersWithoutBeingConsumed() {
+        var machine = HotkeyStateMachine()
+        machine.arm(initialFlagsRawValue: 0)
+        _ = flags(&machine, leftControl, [.maskControl])
+        _ = flags(&machine, leftOption, [.maskControl, .maskAlternate])
+
+        for type in [
+            CGEventType.leftMouseDown,
+            CGEventType.leftMouseDragged,
+            CGEventType.leftMouseUp,
+        ] {
+            let decision = mouse(
+                &machine,
+                type,
+                [.maskControl, .maskAlternate, .maskShift, .maskAlphaShift]
+            )
+            XCTAssertFalse(decision.consume)
+            XCTAssertTrue(decision.actions.isEmpty)
+            XCTAssertEqual(
+                decision.flagsForDelivery(
+                    [.maskControl, .maskAlternate, .maskShift, .maskAlphaShift]
+                ),
+                [.maskShift, .maskAlphaShift]
+            )
+        }
+    }
+
+    func testLeftMouseEventsRemainUnchangedOutsideActiveChord() {
+        var machine = HotkeyStateMachine()
+        machine.arm(initialFlagsRawValue: 0)
+        let modifiers: CGEventFlags = [.maskControl, .maskAlternate]
+
+        let beforeChord = mouse(&machine, .leftMouseDown, modifiers)
+        XCTAssertEqual(beforeChord, .pass)
+        XCTAssertEqual(beforeChord.flagsForDelivery(modifiers), modifiers)
+
+        _ = flags(&machine, leftControl, [.maskControl])
+        _ = flags(&machine, leftOption, [.maskControl, .maskAlternate])
+        _ = flags(&machine, leftOption, [.maskControl])
+        _ = flags(&machine, leftControl, [])
+
+        let afterRelease = mouse(&machine, .leftMouseDown, modifiers)
+        XCTAssertEqual(afterRelease, .pass)
+        XCTAssertEqual(afterRelease.flagsForDelivery(modifiers), modifiers)
+    }
+
+    func testNonLeftMouseEventsAreNeverModified() {
+        var machine = HotkeyStateMachine()
+        machine.arm(initialFlagsRawValue: 0)
+        _ = flags(&machine, leftControl, [.maskControl])
+        _ = flags(&machine, leftOption, [.maskControl, .maskAlternate])
+        let modifiers: CGEventFlags = [.maskControl, .maskAlternate]
+
+        for type in [
+            CGEventType.rightMouseDown,
+            CGEventType.rightMouseUp,
+            CGEventType.otherMouseDown,
+            CGEventType.otherMouseUp,
+            CGEventType.mouseMoved,
+            CGEventType.scrollWheel,
+        ] {
+            let decision = mouse(&machine, type, modifiers)
+            XCTAssertEqual(decision, .pass)
+            XCTAssertEqual(decision.flagsForDelivery(modifiers), modifiers)
+        }
+    }
+
     private func flags(
         _ machine: inout HotkeyStateMachine,
         _ keyCode: Int64,
@@ -184,6 +251,19 @@ final class PhaseSevenHotkeyTests: XCTestCase {
         machine.process(
             typeRawValue: type.rawValue,
             keyCode: keyCode,
+            flagsRawValue: flags.rawValue,
+            marker: 0
+        )
+    }
+
+    private func mouse(
+        _ machine: inout HotkeyStateMachine,
+        _ type: CGEventType,
+        _ flags: CGEventFlags
+    ) -> HotkeyDecision {
+        machine.process(
+            typeRawValue: type.rawValue,
+            keyCode: 0,
             flagsRawValue: flags.rawValue,
             marker: 0
         )

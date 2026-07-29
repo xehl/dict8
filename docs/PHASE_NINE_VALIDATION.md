@@ -119,3 +119,17 @@ Accepted by the owner for full-time personal use on 2026-07-27 using the signed 
 Automated verification passed 91 tests, and the unsigned Release configuration built successfully before signed validation. Earlier signed validation covers TextEdit, ChatGPT, Codex, Cursor, representative speech longer than two minutes, the 180-second cutoff, sounds, HUD, fallback behavior, temporary-data deletion, target-change copying, secure-field refusal, and Paste Last. Claude, Safari, and Chrome were not individually rerun for this final acceptance and remain deferred compatibility checks rather than blockers for the owner's current workflow.
 
 No transcript text, API keys, audio, screenshots containing dictated content, or clipboard contents were retained in this acceptance record.
+
+## Maintenance regression — left-click while dictating
+
+Automated verification expanded the suite to 94 passing tests on 2026-07-28. The owner completed signed manual verification on 2026-07-29: left-clicking during dictation no longer opened the contextual cut/copy/paste menu, ordinary focus behavior remained intact, and Paste Last inserted a long cached result with no noticeable delay. The Paste Last result indicates that bulk insertion is not a material bottleneck. A slower first dictation after an idle period remains a separate cold-request performance investigation.
+
+1. Launch the signed installed copy of dict8 and confirm Global shortcuts is **Running**.
+2. Open TextEdit with two blank lines and place the insertion point on the first line.
+3. Hold `Control + Option`, begin dictating harmless text, and left-click the second line without releasing the chord.
+4. Confirm no Cut/Copy/Paste contextual menu appears, the recording capsule remains visible, and the insertion point moves to the second line.
+5. Release the chord and confirm exactly one cleaned result appears at the new insertion point.
+6. Repeat with a short left-button drag and confirm the drag behaves normally without stopping or duplicating the recording.
+7. Start dictating in TextEdit, left-click another application, and release there. Confirm dict8 copies and notifies instead of pasting into the new application.
+8. Without dictating, confirm ordinary Control-click still opens the contextual menu.
+9. Confirm right-click and scrolling behave normally both during and outside dictation.
