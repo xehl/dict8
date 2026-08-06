@@ -787,6 +787,7 @@ final class AppCoordinator {
         state.setStatus(.encoding)
         state.clearError()
         productionRecording = (generation, recording)
+        hud.showProcessing()
         recordMetricsStarted(audioSeconds: recording.duration)
 
         pipelineTask = Task { @MainActor [weak self] in
@@ -817,6 +818,7 @@ final class AppCoordinator {
         var usedRawCleanupFallback = false
 
         defer {
+            hud.finishProcessing()
             if audioNeedsDeletion,
                !deleteProductionRecording(recording, generation: generation) {
                 state.setWarning(.temporaryAudioCleanupFailed)

@@ -137,7 +137,7 @@ Approved v0 additions:
 * Automatic paste occurs only if the originating application remains foreground; otherwise copy and notify.
 * Known password and secure fields are refused.
 * Keychain stores the normal-launch API key; `OPENROUTER_API_KEY` is a development override.
-* Every OpenRouter attempt enforces Zero Data Retention.
+* Account-level OpenAI and Google ZDR settings are required for STT because OpenRouter does not apply per-request data-policy controls to the transcription endpoint; cleanup additionally enforces ZDR per request.
 * Each AI stage has one pinned model and at most one explicit fallback.
 * A subtle start/stop cue and non-activating bottom-center microphone HUD provide recording feedback.
 * Normal launch and Launch at Login are included.
@@ -368,9 +368,9 @@ Do not use:
 * More than one explicit cleanup fallback
 * More than one explicit STT fallback
 
-OpenRouter may route one explicitly requested model across multiple ZDR-compatible provider endpoints. This provider-level routing does not count as another model attempt. Do not use OpenRouter's automatic multi-model routing; dict8 owns the one explicit model fallback and its notification behavior.
+OpenRouter may route one explicitly requested model across multiple provider endpoints. Account-level OpenAI and Google ZDR settings must restrict STT routing because the transcription endpoint does not apply per-request data-policy controls. Cleanup requests must also send `provider.zdr: true`. Provider-level routing does not count as another model attempt. Do not use OpenRouter's automatic multi-model routing; dict8 owns the one explicit model fallback and its notification behavior.
 
-The single explicit fallback per stage is approved. It must be configured centrally, ZDR-compatible, and attempted only for the eligible failure classes defined in `PRD.md`.
+The single explicit fallback per stage is approved. It must be configured centrally, covered by the applicable account-level or per-request ZDR control, and attempted only for the eligible failure classes defined in `PRD.md`.
 
 Use one shared OpenRouter client for:
 

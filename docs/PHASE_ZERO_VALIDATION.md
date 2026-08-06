@@ -60,7 +60,7 @@ Do not enter a real password or dictate user content during Phase 0 validation.
 The owner explicitly opted into the authenticated synthetic benchmark on 2026-07-11. The secret-safe harness:
 
 - Generated exact 15-, 120-, and 180-second synthetic English `.m4a` samples.
-- Sent each through the pinned primary STT model with per-request ZDR.
+- Sent each through the pinned primary STT model with a `provider.zdr: true` field. OpenRouter documentation published later clarified that the transcription endpoint did not apply per-request data-policy controls, so account-level OpenAI and Google ZDR is now the authoritative privacy requirement.
 - Recorded only content-free duration, byte counts, latency, status, text length, and usage/cost.
 - Deleted the API key from shell memory and removed temporary text/audio after completion.
 - Did not invoke the fallback because all primary requests succeeded.

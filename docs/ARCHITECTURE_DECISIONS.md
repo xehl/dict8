@@ -20,7 +20,7 @@ v0 is developed and tested on macOS 26.5 for Apple silicon with a macOS 26.0 dep
 
 **Status:** Contracts, candidates, shared transport, and STT adapter validated
 
-The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fallback for STT, and `google/gemini-2.5-flash-lite` with `anthropic/claude-haiku-4.5` fallback for cleanup. They appeared again in the relevant public Models API queries with ZDR filtering on 2026-07-14. Both attempts must enforce per-request ZDR, and each stage permits at most two total model attempts. Re-verify before Phases 5–6 and validate quality/latency through explicit manual tests.
+The verified candidates are `openai/whisper-large-v3` with `google/chirp-3` fallback for STT, and `google/gemini-2.5-flash-lite` with `anthropic/claude-haiku-4.5` fallback for cleanup. They appeared again in the relevant public Models API queries with ZDR filtering on 2026-07-14. Account-level OpenAI and Google ZDR must cover STT; cleanup additionally enforces ZDR per request. Each stage permits at most two total model attempts. Re-verify before changing either pipeline and validate quality/latency through explicit manual tests.
 
 ## ADR-004 — Temporary-file lifecycle
 
@@ -50,19 +50,19 @@ Support `Command + Control + V` as Paste Last Dictation. Retain only the last su
 
 **Status:** Accepted
 
-Store the normal-launch API key in macOS Keychain, with `OPENROUTER_API_KEY` as a development override. Enforce OpenRouter ZDR on every STT and cleanup attempt and disclose that content leaves the Mac for processing.
+Store the normal-launch API key in macOS Keychain, with `OPENROUTER_API_KEY` as a development override. Require account-level OpenAI and Google ZDR for STT, enforce per-request ZDR for cleanup, and disclose that content leaves the Mac for processing.
 
 ## ADR-009 — Recording feedback HUD
 
 **Status:** Accepted
 
-Play distinct, quiet synthesized cues of approximately 80 milliseconds. Finish the start cue before recording begins and stop recording before playing the stop cue so cues are not recorded. Show a small non-activating, click-through microphone HUD at the bottom-center of the active display while recording. The HUD must never take target focus.
+Play distinct, quiet synthesized cues of approximately 80 milliseconds. Finish the start cue before recording begins and stop recording before playing the stop cue so cues are not recorded. Show a small non-activating, click-through microphone HUD at the bottom-center of the active display while recording, then replace the microphone with a spinner while the production payload is processing. Transient content-free feedback temporarily replaces the spinner and restores it if processing is still active. The HUD must never take target focus and must close on every terminal or cancellation path.
 
 ## ADR-010 — Long recording strategy
 
 **Status:** Accepted for initial v0 implementation
 
-Begin with one STT request per recording and no chunking. On 2026-07-11, exact 15-, 120-, and 180-second synthetic `.m4a` files all succeeded through the primary ZDR route with HTTP 200; measured request latency was 1.049–1.927 seconds, and the 180-second upload was 998,540 bytes. The repeated synthetic phrase caused compressed long-form output, so that benchmark validated transport, payload size, and timing rather than representative fidelity. On 2026-07-14, the owner passed the Phase 5 manual test with more than two minutes of representative non-repetitive speech and reported no material compression or missing-section issue. One request per recording therefore remains accepted for v0; add transparent ordered chunking only if later real-world testing demonstrates a regression.
+Begin with one STT request per recording and no chunking. On 2026-07-11, exact 15-, 120-, and 180-second synthetic `.m4a` files all returned HTTP 200; measured request latency was 1.049–1.927 seconds, and the 180-second upload was 998,540 bytes. The request included `provider.zdr: true`, but OpenRouter later clarified that the transcription endpoint does not apply this per-request data-policy control; account-level ZDR now supplies that guarantee. The repeated synthetic phrase caused compressed long-form output, so that benchmark validated transport, payload size, and timing rather than representative fidelity. On 2026-07-14, the owner passed the Phase 5 manual test with more than two minutes of representative non-repetitive speech and reported no material compression or missing-section issue. Later real-world compression prompted deterministic temperature and coverage diagnostics. One request per recording remains accepted while this evidence is gathered; add transparent ordered chunking only if representative failures persist.
 
 ## ADR-011 — Cleanup output safety
 
@@ -80,13 +80,13 @@ The recorder enforces the 180-second limit and returns a completed artifact with
 
 **Status:** Accepted for v0
 
-Every request sets `provider.zdr` to `true`. OpenRouter may route one explicitly requested model across multiple qualifying provider endpoints, preserving model behavior while improving availability. dict8 never supplies OpenRouter's automatic multi-model routing fields; it sends the centrally configured fallback model itself only after an eligible network failure or HTTP 408, 429, 500, 502, 503, or 504 response. HTTP 404 is a terminal configuration error. The caller supplies one deadline for the entire stage, including any valid `Retry-After` wait and the fallback attempt.
+Cleanup requests set `provider.zdr` to `true`; STT relies on required account-level OpenAI and Google ZDR because its endpoint does not apply per-request data-policy controls. OpenRouter may route one explicitly requested model across multiple provider endpoints, preserving model behavior while improving availability under the applicable privacy policy. dict8 never supplies OpenRouter's automatic multi-model routing fields; it sends the centrally configured fallback model itself only after an eligible network failure or HTTP 408, 429, 500, 502, 503, or 504 response. HTTP 404 is a terminal configuration error. The caller supplies one deadline for the entire stage, including any valid `Retry-After` wait and the fallback attempt.
 
 ## ADR-014 — Portable STT response and validation transcript
 
 **Status:** Accepted for Phase 5
 
-Use the common transcription JSON response rather than provider-specific `verbose_json`, because the explicit fallback is not guaranteed to support OpenAI-compatible duration and timestamp extensions. Require trimmed non-empty text; treat all usage fields independently as optional. Send the English language hint, omit temperature, and give the primary plus explicit fallback one shared 45-second deadline.
+Use the common transcription JSON response rather than provider-specific `verbose_json`, because the explicit fallback is not guaranteed to support OpenAI-compatible duration and timestamp extensions. Require trimmed non-empty text; treat all usage fields independently as optional. Send the English language hint, pin temperature to `0`, and give the primary plus explicit fallback one shared 45-second deadline. Compare provider-reported audio seconds with local duration and flag unusually sparse long transcripts as content-free diagnostics without discarding text or automatically spending a second model attempt.
 
 The Settings “Transcribe and Delete” action is a development-validation surface, not transcript history or preview-before-paste. Its read-only transcript exists only in memory and clears explicitly, after two minutes, when Settings closes, on replacement, Disable, Quit, lock, or sleep. The coordinator owns and deletes temporary audio; the provider adapter never owns file deletion.
 

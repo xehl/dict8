@@ -147,6 +147,16 @@ struct SettingsView: View {
                             value: metadata.recordedDuration.formatted(.number.precision(.fractionLength(1))) + " s"
                         )
                         LabeledContent(
+                            "Provider audio duration",
+                            value: metadata.providerAudioSeconds.map {
+                                $0.formatted(.number.precision(.fractionLength(1))) + " s"
+                            } ?? "Not reported"
+                        )
+                        LabeledContent(
+                            "Coverage diagnostic",
+                            value: metadata.coverageDiagnostic.displayName
+                        )
+                        LabeledContent(
                             "Reported cost",
                             value: metadata.cost.map {
                                 "$" + $0.formatted(.number.precision(.fractionLength(6)))

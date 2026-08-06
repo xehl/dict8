@@ -133,3 +133,54 @@ Automated verification expanded the suite to 94 passing tests on 2026-07-28. The
 7. Start dictating in TextEdit, left-click another application, and release there. Confirm dict8 copies and notifies instead of pasting into the new application.
 8. Without dictating, confirm ordinary Control-click still opens the contextual menu.
 9. Confirm right-click and scrolling behave normally both during and outside dictation.
+
+## Maintenance regression — processing HUD
+
+1. Launch the signed installed copy of dict8 and focus a blank TextEdit document.
+2. Hold `Control + Option`, dictate a harmless sentence, and release.
+3. Confirm the microphone changes to a spinner capsule while dict8 is encoding, transcribing, cleaning, or pasting.
+4. While the spinner is visible, press and release `Control + Option` again. Confirm no second recording starts, no microphone replaces the spinner, and the current payload continues processing once.
+5. Confirm the spinner disappears after the text is pasted or copied.
+6. Repeat with a long enough payload to observe a cleanup fallback or raw-cleanup warning. Confirm transient feedback appears and the spinner returns if processing is still active.
+7. Start another dictation, release, and Disable dict8 while the spinner is visible. Confirm the spinner closes immediately and no later paste occurs.
+
+## Maintenance regression — deterministic STT and coverage diagnostics
+
+OpenRouter account privacy settings must have ZDR enabled for both OpenAI and Google before running this paid test.
+
+The coverage diagnostic detects obviously short provider audio and unusually sparse text. **Nominal is necessary but not sufficient**: a response can exceed the word-rate threshold while still omitting one section. Marker and idea retention remain the quality gate.
+
+### Prepare a private test outline
+
+1. In a temporary local note that will not be committed, prepare at least 2:05 of harmless, non-repetitive speech split into six distinct sections.
+2. Give each section a unique spoken marker that would not appear naturally elsewhere. Place markers near the beginning, at roughly 25-second intervals, and near the ending. For example: **amber opening**, **birch checkpoint**, **cobalt checkpoint**, **driftwood checkpoint**, **elm checkpoint**, and **violet ending**.
+3. Give every section a distinct core idea so compression cannot pass merely by retaining the markers.
+4. Do not use confidential information, real customer material, or a transcript already stored in this repository.
+
+### Run three raw-transcription trials
+
+1. Quit dict8, relaunch the signed `/Applications/dict8.app`, and open Settings. The first trial intentionally includes any cold-request behavior.
+2. Under **Audio recording test**, record the complete outline in a natural speaking style. Avoid long silence and avoid mechanically repeating one phrase.
+3. Stop and click **Transcribe and Delete**.
+4. Confirm all six markers appear in order, each section's core idea remains represented, and the ending is not cut off.
+5. Record only these content-free results: trial number, model, primary or fallback attempt, local duration, provider audio duration, coverage category, latency, marker count out of six, omitted-section yes/no, and ending-present yes/no.
+6. Clear the displayed transcript.
+7. Repeat twice without relaunching dict8 so the record contains one cold trial and two warm trials.
+
+Pass the raw STT gate only when all three trials:
+
+- report **Nominal**;
+- report provider duration within ten percent or two seconds of local duration when provider duration is available;
+- retain all six markers in order;
+- retain every section's core idea; and
+- include the intended ending without material compression.
+
+One marker or section failure warrants one confirmation trial. A repeated omission, any abrupt cutoff, or a provider-duration/sparse-transcript diagnostic fails the gate and is evidence for the planned transparent chunking follow-up.
+
+### Verify the full pipeline once
+
+1. Open a blank TextEdit document.
+2. Record the same two-minute outline using the normal `Control + Option` chord.
+3. Release and confirm exactly one result is pasted.
+4. Confirm cleanup retains all six markers and all six section ideas in order without inventing a replacement ending.
+5. Delete the test output after comparison. Do not add it to documentation, fixtures, issues, or commit messages.

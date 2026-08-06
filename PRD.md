@@ -67,7 +67,7 @@ Latency targets are directional because network and model latency vary; they are
 - 180-second automatic recording stop
 - OpenRouter speech-to-text through its dedicated transcription endpoint
 - OpenRouter text cleanup using a pinned model and one configured fallback
-- Zero Data Retention enforcement on every OpenRouter request
+- Account-level OpenAI and Google Zero Data Retention enforcement for STT, plus per-request ZDR enforcement for cleanup
 - Plain-text clipboard write and synthesized `Command + V`
 - `Command + Control + V` to re-paste the last successful dictation from a short-lived memory-only cache
 - Microphone and Accessibility permission handling
@@ -189,7 +189,7 @@ The menu bar provides:
 - Settings
 - Quit
 
-While recording, show a small, non-activating, click-through microphone HUD at the bottom-center of the active display. It must not take keyboard focus or interfere with the target application. The HUD disappears after release or cancellation; processing progress remains available from menu bar state and notifications.
+While recording, show a small, non-activating, click-through microphone HUD at the bottom-center of the active display. On release, replace the microphone with a spinner in the same capsule while encoding, transcription, cleanup, or paste is active. This makes the intentionally ignored push-to-talk chord visibly distinguishable from a failed chord press while one payload is processing. The HUD must not take keyboard focus or interfere with the target application, and it disappears on every terminal outcome or cancellation. Processing progress also remains available from menu bar state and notifications.
 
 Settings displays:
 
@@ -228,7 +228,7 @@ Persist only aggregate metrics in `UserDefaults`:
 - Average transcription, cleanup, and end-to-end latency
 - Last non-content error
 
-Never persist or log API keys, audio content, raw transcript text, cleaned transcript text, base64 audio, or content-bearing server errors. Delete temporary audio on success, failure, cancellation, and cleanup fallback. Enforce OpenRouter Zero Data Retention on both STT and cleanup requests. Explain during setup that audio and transcript text leave the Mac for processing.
+Never persist or log API keys, audio content, raw transcript text, cleaned transcript text, base64 audio, or content-bearing server errors. Delete temporary audio on success, failure, cancellation, and cleanup fallback. OpenRouter account privacy settings must enforce ZDR for the OpenAI and Google model groups used by STT because the transcription endpoint does not apply per-request data-policy controls. Cleanup requests must additionally send `provider.zdr: true`. Explain during setup that audio and transcript text leave the Mac for processing.
 
 The sole content-retention exception is the last-successful memory cache described in §6.6. It expires after ten minutes at most and is cleared on replacement, Disable, Quit, or screen lock.
 
@@ -263,16 +263,16 @@ The coordinator owns this pipeline and depends on protocols for recording, trans
 - `URLSession` and Swift concurrency for networking
 - Keychain Services for normal-launch API-key storage
 - ServiceManagement for Launch at Login
-- A shared `OpenRouterClient` for authentication, ZDR routing, encoding, validation, sanitized errors, timing, cancellation, and fallback behavior
+- A shared `OpenRouterClient` for authentication, cleanup ZDR routing, encoding, validation, sanitized errors, timing, cancellation, and fallback behavior
 - Provider protocols separating orchestration from OpenRouter-specific adapters
 
 Each stage makes at most two model attempts total: the pinned model and one configured fallback. Fallback is eligible for model/provider unavailability, timeouts, rate limits, and transient server or network failures. Authentication, insufficient credits, invalid requests, unsupported media, oversized payloads, decoding errors, secure-field refusal, and invalid successful output do not trigger model fallback. Respect a reasonable `Retry-After` value without exceeding the stage deadline.
 
-Within either explicit model attempt, OpenRouter may route across ZDR-compatible provider endpoints for that same model. dict8 does not use OpenRouter's automatic multi-model routing; it owns the single model fallback so fallback state and notification behavior remain explicit.
+Within either explicit model attempt, OpenRouter may route across provider endpoints for that same model. Account-level OpenAI and Google ZDR settings restrict STT routes; cleanup additionally sets `provider.zdr: true`. dict8 does not use OpenRouter's automatic multi-model routing; it owns the single model fallback so fallback state and notification behavior remain explicit.
 
 Model identifiers live in one configuration type. They must be verified against current OpenRouter documentation at implementation time; this document intentionally does not invent model slugs.
 
-The Phase 0 live benchmark successfully sent exact 15-, 120-, and 180-second synthetic `.m4a` files as single ZDR requests to the pinned STT model. All returned HTTP 200 in under two seconds, and the 180-second upload remained under 1 MB. v0 therefore begins without chunking. The repeated synthetic phrase produced compressed long-form output, so representative non-repetitive prose remains a required compatibility check before v0 readiness.
+The Phase 0 live benchmark successfully sent exact 15-, 120-, and 180-second synthetic `.m4a` files as single requests to the pinned STT model. All returned HTTP 200 in under two seconds, and the 180-second upload remained under 1 MB. Later OpenRouter documentation clarified that the transcription endpoint does not apply per-request data-policy controls, so account-level OpenAI and Google ZDR is now a required setup condition. v0 begins without chunking. The repeated synthetic phrase and later real-world payloads produced compressed output, so STT pins temperature `0` and exposes content-free coverage diagnostics; transparent chunking remains a deliberate follow-up if representative failures persist.
 
 ## 9. Numbered phase plan
 
@@ -385,7 +385,7 @@ Development starts at Phase 0 because no application implementation exists yet. 
 - Shared `OpenRouterClient`
 - Keychain authentication with `OPENROUTER_API_KEY` as a development override
 - Request timing, status validation, sanitized error decoding, and cancellation
-- ZDR enforcement and explicit two-attempt fallback policy
+- Stage-appropriate ZDR enforcement and explicit two-attempt fallback policy
 - Mockable URL transport
 
 **Exit criteria:**

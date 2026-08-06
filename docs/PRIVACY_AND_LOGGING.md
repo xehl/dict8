@@ -41,6 +41,7 @@ These rules apply from the first implementation phase.
 ## Remote processing
 
 - Explain that audio and transcript text leave the Mac for processing.
-- Set `provider.zdr: true` on every OpenRouter request.
+- Require account-level OpenAI and Google ZDR before STT use because OpenRouter does not apply per-request data-policy controls to `/audio/transcriptions`.
+- Set `provider.zdr: true` on every cleanup request.
 - Do not enable OpenRouter prompt logging, debug payloads, plugins, or tools.
 - Fail clearly if no endpoint satisfies ZDR rather than silently relaxing the requirement.

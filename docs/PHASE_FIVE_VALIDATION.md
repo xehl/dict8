@@ -18,10 +18,11 @@ xcodebuild -quiet \
 `PhaseFiveSpeechToTextTests` verifies:
 
 - dedicated endpoint request construction with raw base64 M4A audio and English hint
-- omission of temperature, `verbose_json`, and automatic multi-model routing fields
+- explicit transcription temperature `0` and omission of `verbose_json` and automatic multi-model routing fields
 - the shared 45-second deadline and centrally pinned model pair
 - trimmed non-empty transcript decoding
 - optional and partially malformed usage metadata
+- content-free provider-duration and sparse-transcript coverage diagnostics
 - content-free explicit-fallback metadata
 - empty output, malformed response, typed transport failure, and invalid local audio
 
@@ -34,6 +35,7 @@ The Phase 3 coordinator suite additionally verifies that success and failure bot
 - The coordinator owns deletion of the recorded file on success, failure, cancellation, Disable, Quit, lock, and sleep.
 - A successful validation transcript is read-only, memory-only, and cleared after two minutes, on explicit Clear, replacement, Settings close, or lifecycle cleanup.
 - Usage and fallback displays remain content-free.
+- Account-level OpenAI and Google ZDR must be enabled; the STT endpoint does not apply per-request data-policy controls.
 
 ## Manual live verification
 
@@ -46,7 +48,7 @@ These actions send audio to OpenRouter and consume API credits. The owner author
    - status reaches **Transcribed and deleted audio**;
    - a non-empty, accurate transcript appears;
    - the opening and closing phrases are present;
-   - model, attempt, latency, recorded duration, and reported cost remain content-free;
+   - model, attempt, latency, local and provider durations, coverage diagnostic, and reported cost remain content-free;
    - no Last error appears.
 5. Clear the transcript.
 6. Record at least 2:05 of non-repetitive natural prose. Include unique markers near the beginning, around one minute, and near the end—for example “amber beginning,” “cedar midpoint,” and “violet ending.”

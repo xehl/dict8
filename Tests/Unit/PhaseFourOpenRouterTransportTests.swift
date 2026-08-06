@@ -39,6 +39,28 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
         XCTAssertFalse(response.usedFallback)
     }
 
+    func testTranscriptionReliesOnAccountPrivacyWithoutUnsupportedRequestZDR() async throws {
+        let transport = StubOpenRouterTransport(
+            outcomes: [.response(status: 200, body: successBody)]
+        )
+        let client = makeClient(transport: transport)
+        let body = try JSONSerialization.data(withJSONObject: [
+            "input_audio": ["data": "synthetic", "format": "m4a"],
+        ])
+
+        _ = try await client.execute(
+            OpenRouterRequest(endpoint: .transcription, body: body),
+            models: models,
+            deadline: .seconds(1)
+        )
+
+        let requests = await transport.requests()
+        let sent = try XCTUnwrap(requests.first)
+        let sentBody = try jsonObject(sent.httpBody)
+        XCTAssertNil(sentBody["provider"])
+        XCTAssertEqual(sentBody["model"] as? String, models.primary)
+    }
+
     func testMissingKeyPreventsNetworkRequest() async throws {
         let transport = StubOpenRouterTransport(outcomes: [])
         let client = OpenRouterClient(

@@ -24,6 +24,8 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertNotNil(timing?.transcription)
         XCTAssertNotNil(timing?.cleanup)
         XCTAssertNotNil(timing?.paste)
+        XCTAssertEqual(harness.hud.processingShowCount, 1)
+        XCTAssertEqual(harness.hud.processingFinishCount, 1)
     }
 
     func testCleanupFailurePastesRawTranscriptAndWarns() async {
@@ -148,6 +150,7 @@ final class PhaseEightPipelineTests: XCTestCase {
 
         harness.monitor.onPushToTalkPressed?()
         XCTAssertEqual(harness.recorder.startCount, 1)
+        XCTAssertTrue(harness.hud.isProcessingVisible)
         harness.coordinator.setEnabled(false)
         await waitUntil { harness.recorder.deleteCount == 1 }
 
@@ -158,6 +161,7 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertEqual(harness.metrics.snapshot.successCount, 0)
         XCTAssertEqual(harness.metrics.snapshot.failureCount, 0)
         XCTAssertEqual(harness.metrics.snapshot.cancellationCount, 1)
+        XCTAssertFalse(harness.hud.isProcessingVisible)
     }
 
     func testWorkspaceLifecycleNotificationsCancelPipelineAndClearCache() async {
@@ -480,10 +484,21 @@ private final class PipelineMonitor: HotkeyMonitoring {
 @MainActor
 private final class PipelineHUD: RecordingHUDPresenting {
     private(set) var feedback: [TransientFeedback] = []
+    private(set) var processingShowCount = 0
+    private(set) var processingFinishCount = 0
+    private(set) var isProcessingVisible = false
     func showPreview(for duration: Duration) {}
     func showRecording() {}
+    func showProcessing() {
+        processingShowCount += 1
+        isProcessingVisible = true
+    }
     func showFeedback(_ feedback: TransientFeedback) { self.feedback.append(feedback) }
-    func hide() {}
+    func finishProcessing() {
+        processingFinishCount += 1
+        isProcessingVisible = false
+    }
+    func hide() { isProcessingVisible = false }
 }
 
 @MainActor

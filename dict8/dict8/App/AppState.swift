@@ -174,6 +174,7 @@ nonisolated struct AudioTranscriptionTestMetadata: Equatable, Sendable {
     let latencySeconds: Double
     let recordedDuration: TimeInterval
     let providerAudioSeconds: Double?
+    let coverageDiagnostic: TranscriptionCoverageDiagnostic
     let cost: Double?
 
     init(_ transcription: SpeechTranscription) {
@@ -184,6 +185,7 @@ nonisolated struct AudioTranscriptionTestMetadata: Equatable, Sendable {
             + Double(components.attoseconds) / 1_000_000_000_000_000_000
         recordedDuration = transcription.recordedDuration
         providerAudioSeconds = transcription.usage?.audioSeconds
+        coverageDiagnostic = transcription.coverageDiagnostic
         cost = transcription.usage?.cost
     }
 }

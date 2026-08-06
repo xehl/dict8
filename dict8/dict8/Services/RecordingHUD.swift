@@ -47,14 +47,28 @@ enum TransientFeedback: Equatable, Sendable {
 protocol RecordingHUDPresenting: AnyObject {
     func showPreview(for duration: Duration)
     func showRecording()
+    func showProcessing()
     func showFeedback(_ feedback: TransientFeedback)
+    func finishProcessing()
     func hide()
+}
+
+extension RecordingHUDPresenting {
+    func showProcessing() {}
+    func finishProcessing() { hide() }
 }
 
 @MainActor
 final class RecordingHUDController: RecordingHUDPresenting {
+    private enum PersistentPresentation: Equatable {
+        case recording
+        case processing
+    }
+
     private let panel: NSPanel
     private var presentationTask: Task<Void, Never>?
+    private var persistentPresentation: PersistentPresentation?
+    private var isShowingTransient = false
 
     init() {
         panel = NSPanel(
@@ -80,7 +94,8 @@ final class RecordingHUDController: RecordingHUDPresenting {
     }
 
     func showPreview(for duration: Duration) {
-        present(
+        persistentPresentation = nil
+        showTransient(
             symbolName: "mic.fill",
             message: nil,
             width: 72,
@@ -89,16 +104,31 @@ final class RecordingHUDController: RecordingHUDPresenting {
     }
 
     func showRecording() {
+        presentationTask?.cancel()
+        presentationTask = nil
+        persistentPresentation = .recording
+        isShowingTransient = false
         present(
             symbolName: "mic.fill",
             message: nil,
-            width: 72,
-            duration: nil
+            width: 72
+        )
+    }
+
+    func showProcessing() {
+        presentationTask?.cancel()
+        presentationTask = nil
+        persistentPresentation = .processing
+        isShowingTransient = false
+        present(
+            symbolName: nil,
+            message: nil,
+            width: 72
         )
     }
 
     func showFeedback(_ feedback: TransientFeedback) {
-        present(
+        showTransient(
             symbolName: feedback.symbolName,
             message: feedback.message,
             width: 244,
@@ -106,35 +136,65 @@ final class RecordingHUDController: RecordingHUDPresenting {
         )
     }
 
+    func finishProcessing() {
+        guard persistentPresentation == .processing else { return }
+        persistentPresentation = nil
+        if !isShowingTransient {
+            panel.orderOut(nil)
+        }
+    }
+
     func hide() {
         presentationTask?.cancel()
         presentationTask = nil
+        persistentPresentation = nil
+        isShowingTransient = false
         panel.orderOut(nil)
     }
 
-    private func present(
-        symbolName: String,
+    private func showTransient(
+        symbolName: String?,
         message: String?,
         width: CGFloat,
-        duration: Duration?
+        duration: Duration
     ) {
         presentationTask?.cancel()
-        panel.setContentSize(NSSize(width: width, height: 48))
-        panel.contentView = NSHostingView(
-            rootView: TransientHUDView(symbolName: symbolName, message: message)
-        )
-        positionOnActiveScreen()
-        panel.orderFrontRegardless()
-
-        guard let duration else { return }
+        isShowingTransient = true
+        present(symbolName: symbolName, message: message, width: width)
         presentationTask = Task { [weak self] in
             do {
                 try await Task.sleep(for: duration)
             } catch {
                 return
             }
-            guard !Task.isCancelled else { return }
-            self?.hide()
+            guard let self, !Task.isCancelled else { return }
+            self.isShowingTransient = false
+            self.presentationTask = nil
+            self.restorePersistentPresentation()
+        }
+    }
+
+    private func present(
+        symbolName: String?,
+        message: String?,
+        width: CGFloat
+    ) {
+        panel.setContentSize(NSSize(width: width, height: 48))
+        panel.contentView = NSHostingView(
+            rootView: TransientHUDView(symbolName: symbolName, message: message)
+        )
+        positionOnActiveScreen()
+        panel.orderFrontRegardless()
+    }
+
+    private func restorePersistentPresentation() {
+        switch persistentPresentation {
+        case .recording:
+            present(symbolName: "mic.fill", message: nil, width: 72)
+        case .processing:
+            present(symbolName: nil, message: nil, width: 72)
+        case nil:
+            panel.orderOut(nil)
         }
     }
 
@@ -153,13 +213,17 @@ final class RecordingHUDController: RecordingHUDPresenting {
 }
 
 private struct TransientHUDView: View {
-    let symbolName: String
+    let symbolName: String?
     let message: String?
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: symbolName)
-                .font(.system(size: 20, weight: .semibold))
+            if let symbolName {
+                Image(systemName: symbolName)
+                    .font(.system(size: 20, weight: .semibold))
+            } else {
+                ProcessingSpinner()
+            }
 
             if let message {
                 Text(message)
@@ -171,6 +235,29 @@ private struct TransientHUDView: View {
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 48)
         .background(.black.opacity(0.78), in: Capsule())
-        .accessibilityLabel(message ?? "Recording")
+        .accessibilityLabel(message ?? (symbolName == nil ? "Processing dictation" : "Recording"))
+    }
+}
+
+private struct ProcessingSpinner: View {
+    @State private var isRotating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.14, to: 0.86)
+            .stroke(
+                .white,
+                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+            )
+            .frame(width: 18, height: 18)
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 0.8)
+                        .repeatForever(autoreverses: false)
+                ) {
+                    isRotating = true
+                }
+            }
     }
 }

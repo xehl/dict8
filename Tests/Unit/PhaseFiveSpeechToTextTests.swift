@@ -29,7 +29,7 @@ final class PhaseFiveSpeechToTextTests: XCTestCase {
         XCTAssertEqual(inputAudio["format"] as? String, "m4a")
         XCTAssertEqual(inputAudio["data"] as? String, Data([0x01, 0x02, 0x03]).base64EncodedString())
         XCTAssertEqual(body["language"] as? String, "en")
-        XCTAssertNil(body["temperature"])
+        XCTAssertEqual(body["temperature"] as? Double, 0)
         XCTAssertNil(body["response_format"])
         XCTAssertNil(body["model"])
         XCTAssertEqual(result.text, "synthetic transcript")
@@ -39,6 +39,7 @@ final class PhaseFiveSpeechToTextTests: XCTestCase {
         XCTAssertEqual(result.usage?.audioSeconds, 12.5)
         XCTAssertEqual(result.usage?.totalTokens, 10)
         XCTAssertEqual(result.usage?.cost, 0.004)
+        XCTAssertEqual(result.coverageDiagnostic, .nominal)
     }
 
     func testUsageIsOptionalAndMalformedValuesDoNotRejectText() async throws {
@@ -72,6 +73,46 @@ final class PhaseFiveSpeechToTextTests: XCTestCase {
         XCTAssertTrue(result.usedFallback)
         XCTAssertEqual(result.model, models.fallback)
         XCTAssertNil(result.usage)
+    }
+
+    func testCoverageFlagsProviderDurationMateriallyShorterThanRecording() {
+        XCTAssertEqual(
+            TranscriptionCoverageDiagnostic.assess(
+                text: "synthetic transcript with enough words for a normal result",
+                recordedDuration: 60,
+                providerAudioSeconds: 42
+            ),
+            .providerDurationShort
+        )
+    }
+
+    func testCoverageFlagsSparseLongTranscriptButDoesNotRejectIt() async throws {
+        let response = OpenRouterResponse(
+            data: Data(#"{"text":"short compressed result","usage":{"seconds":30}}"#.utf8),
+            model: models.primary,
+            attemptNumber: 1,
+            latency: .milliseconds(1)
+        )
+        let service = makeService(
+            transport: SpeechTransportStub(result: .success(response))
+        )
+
+        let result = try await service.transcribe(recording(duration: 30))
+
+        XCTAssertEqual(result.text, "short compressed result")
+        XCTAssertEqual(result.coverageDiagnostic, .sparseTranscript)
+    }
+
+    func testCoverageAllowsOrdinarySpeechDensity() {
+        let words = Array(repeating: "synthetic", count: 30).joined(separator: " ")
+        XCTAssertEqual(
+            TranscriptionCoverageDiagnostic.assess(
+                text: words,
+                recordedDuration: 30,
+                providerAudioSeconds: 30
+            ),
+            .nominal
+        )
     }
 
     func testEmptySuccessfulTranscriptIsRejectedWithoutAnotherTransportAttempt() async throws {
@@ -147,10 +188,10 @@ final class PhaseFiveSpeechToTextTests: XCTestCase {
         )
     }
 
-    private func recording() -> RecordedAudioFile {
+    private func recording(duration: TimeInterval = 12.5) -> RecordedAudioFile {
         RecordedAudioFile(
             url: URL(fileURLWithPath: "/tmp/synthetic-phase-five.m4a"),
-            duration: 12.5,
+            duration: duration,
             sampleRate: 16_000,
             channelCount: 1,
             bitRate: 32_000

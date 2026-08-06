@@ -265,12 +265,14 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
             throw OpenRouterClientError.invalidRequest
         }
 
-        var provider = body["provider"] as? [String: Any] ?? [:]
-        if body["provider"] != nil, !(body["provider"] is [String: Any]) {
-            throw OpenRouterClientError.invalidRequest
+        if request.endpoint == .chatCompletions {
+            var provider = body["provider"] as? [String: Any] ?? [:]
+            if body["provider"] != nil, !(body["provider"] is [String: Any]) {
+                throw OpenRouterClientError.invalidRequest
+            }
+            provider["zdr"] = true
+            body["provider"] = provider
         }
-        provider["zdr"] = true
-        body["provider"] = provider
         body["model"] = model
 
         guard JSONSerialization.isValidJSONObject(body) else {

@@ -11,7 +11,7 @@ Verified against official OpenRouter documentation, the public Models API, and t
 - Common documented formats include `wav`, `mp3`, `flac`, `m4a`, `ogg`, `webm`, and `aac`; actual support varies by provider.
 - Response includes `text` and optional `usage` values such as `seconds`, token counts, and `cost`.
 - The OpenAPI schema requires only `text` in the standard response. `verbose_json` adds duration and timestamps but is limited to OpenAI-compatible providers, so v0 uses the standard response for portability across the configured model fallback.
-- Phase 5 sends `language: "en"`, omits temperature, and shares a 45-second deadline across both explicit model attempts.
+- Phase 5 sends `language: "en"`, pins temperature to `0`, and shares a 45-second deadline across both explicit model attempts.
 - Multipart requests are also supported and capped at 25 MB. The JSON/base64 path remains the planned v0 integration because the PRD explicitly calls for just-in-time base64 construction.
 - OpenRouter warns that large audio can encounter upstream timeouts and recommends splitting when necessary. The 180-second requirement therefore remains a measured decision, not an assumption.
 
@@ -37,9 +37,9 @@ Official references:
 
 ## ZDR and routing
 
-Every request must include `provider.zdr: true`. This restricts routing to endpoints OpenRouter currently marks as Zero Data Retention. A model can become unavailable under this restriction even if it remains generally available.
+Cleanup requests include `provider.zdr: true`, restricting routing to endpoints OpenRouter currently marks as Zero Data Retention. OpenRouter's July 22, 2026 transcription guidance states that per-request routing and data-policy controls are not applied to `/audio/transcriptions`; the STT `provider` object carries provider-specific options only. dict8 therefore requires account-level OpenAI and Google ZDR settings for its Whisper primary and Chirp fallback and does not send an unsupported STT `provider.zdr` field.
 
-OpenRouter may use its default provider fallback among ZDR-compatible endpoints for the one requested model. dict8 does not need to send `allow_fallbacks`, and must not send the `models` or `route` fields for automatic multi-model routing. Instead, dict8 owns the configured second-model attempt and can report when the pinned model failed. The transcription OpenAPI schema currently describes `provider` as a passthrough object rather than the full chat `ProviderPreferences` schema; the Phase 0 live benchmark verified that per-request `provider.zdr: true` is honored by the transcription endpoint.
+OpenRouter may use its default provider fallback for the one requested model. The applicable account-level or per-request ZDR control must restrict those routes. dict8 does not send `allow_fallbacks`, `models`, or `route` fields for automatic multi-model routing. Instead, dict8 owns the configured second-model attempt and can report when the pinned model failed.
 
 - [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr)
 - Current ZDR endpoint catalog: `GET /api/v1/endpoints/zdr`
@@ -54,7 +54,7 @@ OpenRouter may use its default provider fallback among ZDR-compatible endpoints 
 
 These are explicit candidates, not quality claims. The cleanup corpus and manual live tests must validate behavior before v0 readiness.
 
-On 2026-07-16, both STT identifiers remained in the filtered transcription catalog with `audio -> transcription` modality, and both cleanup identifiers remained in the general catalog with text output and temperature support. The live ZDR endpoint catalog listed at least one route for every configured identifier: Groq and Together for Whisper, Google for Chirp and Gemini Flash Lite, and Amazon Bedrock and Google for Claude Haiku. This is a point-in-time availability check; every runtime request still sets `provider.zdr: true` and fails closed if no qualifying route is available.
+On 2026-07-16, both STT identifiers remained in the filtered transcription catalog with `audio -> transcription` modality, and both cleanup identifiers remained in the general catalog with text output and temperature support. The live ZDR endpoint catalog listed at least one route for every configured identifier: Groq and Together for Whisper, Google for Chirp and Gemini Flash Lite, and Amazon Bedrock and Google for Claude Haiku. This is a point-in-time availability check. On 2026-07-29, the owner enabled account-level OpenAI and Google ZDR for STT; cleanup continues to set `provider.zdr: true` per request.
 
 ## Errors and attempt policy
 
@@ -66,7 +66,7 @@ dict8 permits two total model attempts per stage. Network interruption and HTTP 
 
 ## Live-test status
 
-The owner explicitly opted into the synthetic STT benchmark on 2026-07-11. Exact 15-, 120-, and 180-second `.m4a` inputs all succeeded against `openai/whisper-large-v3` with per-request ZDR and no fallback. Content-free results are stored in `PHASE_ZERO_BENCHMARK_RESULTS.json`; the API key, audio, base64 payload, and transcript text were not retained.
+The owner explicitly opted into the synthetic STT benchmark on 2026-07-11. Exact 15-, 120-, and 180-second `.m4a` inputs all succeeded against `openai/whisper-large-v3` with no model fallback. Those requests included `provider.zdr: true`; OpenRouter's later transcription guidance clarified that this per-request control was not applied by that endpoint, so the benchmark cannot substantiate the earlier ZDR claim. Account-level OpenAI and Google ZDR is now required. Content-free results are stored in `PHASE_ZERO_BENCHMARK_RESULTS.json`; the API key, audio, base64 payload, and transcript text were not retained.
 
 On 2026-07-14 the owner authorized and passed paid Phase 5 live tests for a short recording and a representative recording longer than two minutes. No material compression or missing-section issue was reported. Transcript content was not written to documentation or logs.
 

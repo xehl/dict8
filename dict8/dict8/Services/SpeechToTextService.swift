@@ -15,6 +15,55 @@ nonisolated struct SpeechTranscription: Equatable, Sendable {
     let latency: Duration
     let recordedDuration: TimeInterval
     let usage: SpeechTranscriptionUsage?
+
+    var coverageDiagnostic: TranscriptionCoverageDiagnostic {
+        TranscriptionCoverageDiagnostic.assess(
+            text: text,
+            recordedDuration: recordedDuration,
+            providerAudioSeconds: usage?.audioSeconds
+        )
+    }
+}
+
+nonisolated enum TranscriptionCoverageDiagnostic: String, Equatable, Sendable {
+    case nominal
+    case providerDurationShort
+    case sparseTranscript
+
+    var displayName: String {
+        switch self {
+        case .nominal: "Nominal"
+        case .providerDurationShort: "Provider duration shorter than recording"
+        case .sparseTranscript: "Unusually sparse transcript"
+        }
+    }
+
+    static func assess(
+        text: String,
+        recordedDuration: TimeInterval,
+        providerAudioSeconds: Double?
+    ) -> Self {
+        if let providerAudioSeconds,
+           providerAudioSeconds.isFinite,
+           recordedDuration.isFinite,
+           recordedDuration > 0 {
+            let tolerance = max(2, recordedDuration * 0.1)
+            if providerAudioSeconds + tolerance < recordedDuration {
+                return .providerDurationShort
+            }
+        }
+
+        let effectiveDuration = providerAudioSeconds ?? recordedDuration
+        guard effectiveDuration.isFinite, effectiveDuration >= 20 else {
+            return .nominal
+        }
+        let wordCount = text.split(whereSeparator: { character in
+            !character.isLetter && !character.isNumber
+        }).count
+        return Double(wordCount) / effectiveDuration < 1
+            ? .sparseTranscript
+            : .nominal
+    }
 }
 
 nonisolated enum SpeechToTextError: Error, Equatable, LocalizedError, Sendable {
@@ -52,6 +101,7 @@ nonisolated protocol SpeechToTextProviding: Sendable {
 
 actor OpenRouterSpeechToTextService: SpeechToTextProviding {
     static let defaultDeadline: Duration = .seconds(45)
+    static let temperature = 0.0
 
     private let transport: any OpenRouterTransporting
     private let models: AIModelPair
@@ -100,7 +150,8 @@ actor OpenRouterSpeechToTextService: SpeechToTextProviding {
                         data: audio.base64EncodedString(),
                         format: "m4a"
                     ),
-                    language: "en"
+                    language: "en",
+                    temperature: Self.temperature
                 )
             )
         } catch {
@@ -156,10 +207,12 @@ nonisolated private struct TranscriptionRequest: Encodable {
 
     let inputAudio: InputAudio
     let language: String
+    let temperature: Double
 
     enum CodingKeys: String, CodingKey {
         case inputAudio = "input_audio"
         case language
+        case temperature
     }
 }
 
