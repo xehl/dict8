@@ -2,8 +2,6 @@
 
 dict8 is a native macOS push-to-talk dictation utility. Hold `Control + Option`, speak, and release. dict8 records the utterance, transcribes it, lightly cleans the prose, and pastes the result back into the application where recording began.
 
-The cleanup goal is simple: **“Me but punctuated.”**
-
 ## Status
 
 The personal v0 is in routine use on Apple silicon with macOS 26. It supports short and long-form dictation, a three-minute recording limit, target-safe paste, a ten-minute memory-only Paste Last cache, and content-free aggregate usage metrics.
@@ -50,7 +48,6 @@ Audio and transcript text leave the Mac for processing through OpenRouter and it
 - The last successful output may remain in process memory for at most ten minutes for Paste Last. It is never persisted and clears on replacement, expiry, Disable, Quit, or screen lock.
 - Aggregate request, duration, latency, cost, and outcome metrics contain no dictated text.
 - The API key is stored in macOS Keychain. `OPENROUTER_API_KEY` is available only as an explicit development override.
-- OpenRouter account-level ZDR must be enabled for the OpenAI and Google model groups used by transcription. Cleanup requests additionally enforce ZDR per request.
 
 Review [Privacy and logging](docs/PRIVACY_AND_LOGGING.md) and OpenRouter's [Zero Data Retention documentation](https://openrouter.ai/docs/guides/features/zdr) before using dict8 with sensitive speech.
 
