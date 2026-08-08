@@ -8,7 +8,7 @@ The cleanup goal is simple: **“Me but punctuated.”**
 
 The personal v0 is in routine use on Apple silicon with macOS 26. It supports short and long-form dictation, a three-minute recording limit, target-safe paste, a ten-minute memory-only Paste Last cache, and content-free aggregate usage metrics.
 
-dict8 is currently distributed as source. There is no notarized public binary or automatic updater.
+dict8 is currently distributed as source under the [MIT License](LICENSE). There is no notarized public binary or automatic updater.
 
 ## Requirements
 
@@ -85,3 +85,7 @@ Select the `dict8` scheme and **My Mac** destination in Xcode:
 Do not run the Xcode-launched app and `/Applications/dict8.app` simultaneously. Both instances would monitor the same global shortcut.
 
 Validation procedures are retained under [`docs/`](docs/). Use synthetic or harmless speech; never commit real transcripts, recordings, API keys, or screenshots containing dictated content.
+
+## License
+
+dict8 is released under the [MIT License](LICENSE).

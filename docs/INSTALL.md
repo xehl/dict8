@@ -38,8 +38,6 @@ cd dict8
 open dict8/dict8.xcodeproj
 ```
 
-Until the repository is public, clone it through a GitHub account that has access or use the authenticated SSH URL.
-
 In Xcode:
 
 1. Open **Xcode → Settings → Accounts**.
@@ -49,6 +47,8 @@ In Xcode:
 5. Enable **Automatically manage signing** and select your team.
 6. If Xcode reports that `com.xehl.dict8` is unavailable to your team, change the bundle identifier to a unique reverse-DNS value such as `com.yourname.dict8`.
 7. Select the **dict8Tests** target and apply the same signing team. Give its bundle identifier a matching unique prefix if Xcode requires it.
+
+The checked-in project keeps the maintainer's signing team and bundle identifiers so installed development builds retain a stable macOS identity. Selecting your own team or identifiers may create a local `project.pbxproj` change. That is expected for a source installation; do not commit that machine-specific signing change unless you intentionally maintain a fork with its own identity.
 
 Keep **Hardened Runtime** enabled and **App Sandbox** disabled. dict8 requires an active Accessibility event tap and focused-element inspection; the current implementation did not receive the required authorization while sandboxed. The application target must retain its Audio Input entitlement.
 
