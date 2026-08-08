@@ -103,7 +103,7 @@ The API key and permission grants do not migrate from another Mac. Configure the
 
 ## 8. Updating an installation
 
-1. Pull the desired commit while the repository is still private and review the changes.
+1. Pull the desired commit and review the changes.
 2. Run the complete unit-test suite.
 3. Create a new Release archive.
 4. Quit dict8.
