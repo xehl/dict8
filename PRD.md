@@ -200,7 +200,7 @@ Settings displays:
 - Transcription and cleanup model identifiers
 - Aggregate requests, audio minutes, estimated cost, and average latency
 - Last content-free error
-- Test microphone, test paste, and—when available—test pipeline actions
+- Xcode Debug builds additionally expose microphone, paste, cleanup, and HUD validation actions; archived Release builds omit these development controls
 - Launch at Login setting
 
 The UI is functional and plain. v0 includes only the minimal microphone HUD, not an interactive or persistent floating interface.

@@ -74,6 +74,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            #if DEBUG
             Section("Audio recording test") {
                 LabeledContent("Status", value: appState.audioTestStatus.displayName)
 
@@ -264,12 +265,15 @@ struct SettingsView: View {
                 Text("Input and output remain only in memory and clear after two minutes, when Settings closes, or during lifecycle cleanup. A rejected or failed cleanup displays the unchanged raw input.")
                     .foregroundStyle(.secondary)
             }
+            #endif
 
             Section("Paste") {
                 LabeledContent(
                     "Paste last dictation",
                     value: appState.configuration.pasteLastHotkeyDisplayName
                 )
+
+                #if DEBUG
                 LabeledContent("Test status", value: appState.testPasteStatus.displayName)
 
                 Button("Paste Test Text in 3 Seconds") {
@@ -284,6 +288,7 @@ struct SettingsView: View {
 
                 Text("After clicking, focus a TextEdit document. A successful test seeds Paste Last for ten minutes.")
                     .foregroundStyle(.secondary)
+                #endif
             }
 
             Section("OpenRouter") {
@@ -386,6 +391,7 @@ struct SettingsView: View {
                 }
             }
 
+            #if DEBUG
             Section("Recording HUD") {
                 Button("Preview Recording HUD") {
                     coordinator.previewHUD()
@@ -393,6 +399,7 @@ struct SettingsView: View {
                 Text("The preview disappears automatically and must not take keyboard focus.")
                     .foregroundStyle(.secondary)
             }
+            #endif
 
             Section("Models") {
                 let models = AIModelConfiguration.phaseZeroVerified
