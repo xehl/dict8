@@ -240,5 +240,14 @@ private actor SpeechTransportStub: OpenRouterTransporting {
         return try result.get()
     }
 
+    func execute(
+        _ request: OpenRouterRequest,
+        model: String,
+        autoRouter: AutoRouterSettings?,
+        deadline: Duration
+    ) throws -> OpenRouterResponse {
+        fatalError("SpeechTransportStub does not exercise the single-model execute path")
+    }
+
     func executions() -> [Execution] { captured }
 }

@@ -24,7 +24,8 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
 
         XCTAssertEqual(execution.request.endpoint, .chatCompletions)
-        XCTAssertEqual(execution.models, models)
+        XCTAssertEqual(execution.model, model)
+        XCTAssertEqual(execution.autoRouter, OpenRouterTextCleanupService.autoRouterSettings)
         XCTAssertEqual(execution.deadline, .seconds(30))
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0]["role"] as? String, "system")
@@ -62,13 +63,12 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         )
     }
 
-    func testFallbackMetadataAndMalformedUsageRemainNonfatal() async throws {
+    func testAutoRouterResponseModelAndMalformedUsageRemainNonfatal() async throws {
         let transport = CleanupTransportStub(
             result: .success(
                 response(
                     text: "Keep this technical sentence intact.",
-                    model: models.fallback,
-                    attempt: 2,
+                    model: "anthropic/claude-haiku-4.5",
                     usage: #", "usage":{"prompt_tokens":"unknown","cost":-1}"#
                 )
             )
@@ -78,8 +78,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             "keep this technical sentence intact"
         )
 
-        XCTAssertTrue(result.usedFallback)
-        XCTAssertEqual(result.model, models.fallback)
+        XCTAssertEqual(result.model, "anthropic/claude-haiku-4.5")
         XCTAssertNil(result.usage)
     }
 
@@ -196,19 +195,15 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertNil(state.cleanupTestOutput)
     }
 
-    private let models = AIModelPair(
-        primary: "synthetic/primary",
-        fallback: "synthetic/fallback"
-    )
+    private let model = "openrouter/auto"
 
     private func makeService(transport: CleanupTransportStub) -> OpenRouterTextCleanupService {
-        OpenRouterTextCleanupService(transport: transport, models: models)
+        OpenRouterTextCleanupService(transport: transport, model: model)
     }
 
     private func response(
         text: String,
         model: String? = nil,
-        attempt: Int = 1,
         finishReason: String = "stop",
         usage: String = ""
     ) -> OpenRouterResponse {
@@ -219,8 +214,8 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         let body = #"{"choices":[{"message":{"content":"\#(escapedText)"},"finish_reason":"\#(finishReason)"}]\#(usage)}"#
         return OpenRouterResponse(
             data: Data(body.utf8),
-            model: model ?? models.primary,
-            attemptNumber: attempt,
+            model: model ?? self.model,
+            attemptNumber: 1,
             latency: .milliseconds(25)
         )
     }
@@ -285,7 +280,8 @@ final class PhaseSixTextCleanupTests: XCTestCase {
 private actor CleanupTransportStub: OpenRouterTransporting {
     struct Execution: Sendable {
         let request: OpenRouterRequest
-        let models: AIModelPair
+        let model: String
+        let autoRouter: AutoRouterSettings?
         let deadline: Duration
     }
 
@@ -301,7 +297,16 @@ private actor CleanupTransportStub: OpenRouterTransporting {
         models: AIModelPair,
         deadline: Duration
     ) throws -> OpenRouterResponse {
-        captured.append(Execution(request: request, models: models, deadline: deadline))
+        try result.get()
+    }
+
+    func execute(
+        _ request: OpenRouterRequest,
+        model: String,
+        autoRouter: AutoRouterSettings?,
+        deadline: Duration
+    ) throws -> OpenRouterResponse {
+        captured.append(Execution(request: request, model: model, autoRouter: autoRouter, deadline: deadline))
         return try result.get()
     }
 

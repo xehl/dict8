@@ -12,10 +12,10 @@ final class PhaseZeroFoundationTests: XCTestCase {
             configuration.transcriptionModel,
             configuration.transcriptionFallbackModel
         )
-        XCTAssertNotEqual(
-            configuration.cleanupModel,
-            configuration.cleanupFallbackModel
-        )
+        // Cleanup is an approved exception to the pinned-model-plus-fallback
+        // rule: it routes through OpenRouter's Auto Router as a single
+        // explicit model attempt (AGENTS.md §4, PRD.md §8).
+        XCTAssertEqual(configuration.cleanupModel, "openrouter/auto")
     }
 
     func testFocusedElementSnapshotCarriesNoFieldValue() {

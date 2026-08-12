@@ -10,6 +10,17 @@ nonisolated struct OpenRouterRequest: Sendable {
     let body: Data
 }
 
+/// Request-level routing settings for OpenRouter's Auto Router
+/// (https://openrouter.ai/docs/features/model-routing). Applies only to the
+/// single-model-attempt execution path.
+nonisolated struct AutoRouterSettings: Equatable, Sendable {
+    enum CostTier: String, Sendable {
+        case low, medium, high, xhigh, max
+    }
+
+    let costTier: CostTier
+}
+
 nonisolated struct OpenRouterResponse: Sendable {
     let data: Data
     let model: String
@@ -117,6 +128,15 @@ protocol OpenRouterTransporting: Sendable {
     func execute(
         _ request: OpenRouterRequest,
         models: AIModelPair,
+        deadline: Duration
+    ) async throws -> OpenRouterResponse
+
+    /// Single explicit model attempt, no dict8-side fallback. Used by stages
+    /// with an approved automatic-routing exception (see AGENTS.md §4).
+    func execute(
+        _ request: OpenRouterRequest,
+        model: String,
+        autoRouter: AutoRouterSettings?,
         deadline: Duration
     ) async throws -> OpenRouterResponse
 }
@@ -243,6 +263,56 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         throw OpenRouterClientError.invalidResponse
     }
 
+    func execute(
+        _ request: OpenRouterRequest,
+        model: String,
+        autoRouter: AutoRouterSettings? = nil,
+        deadline: Duration
+    ) async throws -> OpenRouterResponse {
+        guard deadline > .zero, !model.isEmpty else {
+            throw OpenRouterClientError.invalidRequest
+        }
+
+        let apiKey = try await loadAPIKey()
+        let clock = ContinuousClock()
+        let executionStartedAt = clock.now
+        try Task.checkCancellation()
+
+        let urlRequest = try makeURLRequest(
+            request,
+            model: model,
+            apiKey: apiKey,
+            autoRouter: autoRouter
+        )
+        do {
+            let result = try await perform(urlRequest, timeout: deadline)
+            guard (200 ... 299).contains(result.response.statusCode) else {
+                let failure = classifiedFailure(from: result)
+                if failure.statusCode == 503 {
+                    throw OpenRouterClientError.zdrUnavailable
+                }
+                throw failure.error
+            }
+            return OpenRouterResponse(
+                data: result.data,
+                model: model,
+                attemptNumber: 1,
+                latency: executionStartedAt.duration(to: clock.now)
+            )
+        } catch is CancellationError {
+            throw OpenRouterClientError.cancelled
+        } catch let error as OpenRouterClientError {
+            throw error
+        } catch let error as URLError {
+            if error.code == .cancelled || Task.isCancelled {
+                throw OpenRouterClientError.cancelled
+            }
+            throw OpenRouterClientError.networkFailure
+        } catch {
+            throw OpenRouterClientError.networkFailure
+        }
+    }
+
     private func loadAPIKey() async throws -> String {
         do {
             return try await apiKeyStore.apiKey()
@@ -256,7 +326,8 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
     private func makeURLRequest(
         _ request: OpenRouterRequest,
         model: String,
-        apiKey: String
+        apiKey: String,
+        autoRouter: AutoRouterSettings? = nil
     ) throws -> URLRequest {
         guard let baseURL,
               var body = try JSONSerialization.jsonObject(with: request.body) as? [String: Any],
@@ -274,6 +345,16 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
             body["provider"] = provider
         }
         body["model"] = model
+
+        if let autoRouter {
+            guard body["plugins"] == nil else {
+                throw OpenRouterClientError.invalidRequest
+            }
+            body["plugins"] = [[
+                "id": "auto-router",
+                "cost_tier": autoRouter.costTier.rawValue,
+            ]]
+        }
 
         guard JSONSerialization.isValidJSONObject(body) else {
             throw OpenRouterClientError.invalidRequest

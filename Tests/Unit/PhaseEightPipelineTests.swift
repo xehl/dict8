@@ -122,17 +122,16 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertTrue(harness.hud.feedback.contains(.temporaryAudioCleanupFailed))
     }
 
-    func testFallbackNotificationsAreContentFreeAndFinalWarningUsesCleanupFallback() async {
+    func testTranscriptionFallbackNotificationIsContentFreeAndFinalWarningReflectsIt() async {
         let harness = PipelineHarness(
             transcriptionResult: .success(Self.transcription(usedFallback: true)),
-            cleanupResult: .success(Self.cleanup(usedFallback: true))
+            cleanupResult: .success(Self.cleanup())
         )
 
         await runDictation(harness)
-        await waitUntil { harness.state.lastError == .cleanupFallbackUsed }
+        await waitUntil { harness.state.lastError == .transcriptionFallbackUsed }
 
         XCTAssertTrue(harness.hud.feedback.contains(.transcriptionFallbackUsed))
-        XCTAssertTrue(harness.hud.feedback.contains(.cleanupFallbackUsed))
         XCTAssertFalse(
             harness.hud.feedback.map(\.message).contains {
                 $0.contains("raw synthetic transcript")
@@ -267,11 +266,10 @@ final class PhaseEightPipelineTests: XCTestCase {
         )
     }
 
-    fileprivate static func cleanup(usedFallback: Bool = false) -> TextCleanupResult {
+    fileprivate static func cleanup() -> TextCleanupResult {
         TextCleanupResult(
             text: "Cleaned synthetic transcript.",
-            model: usedFallback ? "synthetic/cleanup-fallback" : "synthetic/cleanup-primary",
-            usedFallback: usedFallback,
+            model: "openrouter/auto",
             latency: .milliseconds(10),
             usage: TextCleanupUsage(
                 promptTokens: nil,

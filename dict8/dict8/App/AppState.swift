@@ -193,15 +193,14 @@ nonisolated struct AudioTranscriptionTestMetadata: Equatable, Sendable {
 nonisolated enum CleanupTestStatus: Equatable, Sendable {
     case idle
     case cleaning
-    case cleaned(usedFallback: Bool)
+    case cleaned
     case rawFallback
 
     var displayName: String {
         switch self {
         case .idle: "Ready"
         case .cleaning: "Cleaning"
-        case let .cleaned(usedFallback):
-            usedFallback ? "Cleaned with fallback model" : "Cleaned with primary model"
+        case .cleaned: "Cleaned"
         case .rawFallback: "Cleanup rejected or failed — showing raw text"
         }
     }
@@ -248,7 +247,6 @@ nonisolated enum CleanupTestFixture: String, CaseIterable, Identifiable, Sendabl
 
 nonisolated struct CleanupTestMetadata: Equatable, Sendable {
     let model: String
-    let usedFallback: Bool
     let latencySeconds: Double
     let promptTokens: Int?
     let completionTokens: Int?
@@ -256,7 +254,6 @@ nonisolated struct CleanupTestMetadata: Equatable, Sendable {
 
     init(_ result: TextCleanupResult) {
         model = result.model
-        usedFallback = result.usedFallback
         let components = result.latency.components
         latencySeconds = Double(components.seconds)
             + Double(components.attoseconds) / 1_000_000_000_000_000_000
@@ -291,7 +288,6 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
     case audioPlaybackFailed
     case recordingCueFailed
     case transcriptionFallbackUsed
-    case cleanupFallbackUsed
     case focusChangedCopied
     case transcriptionAndAudioCleanupFailed(SpeechToTextError)
     case transcriptionFailed(SpeechToTextError)
@@ -347,8 +343,6 @@ enum AppShellError: Equatable, LocalizedError, Sendable {
             "dict8 could not play a recording cue, but processing continued."
         case .transcriptionFallbackUsed:
             "The primary transcription model failed; dict8 used its fallback model."
-        case .cleanupFallbackUsed:
-            "The primary cleanup model failed; dict8 used its fallback model."
         case .focusChangedCopied:
             "Focus changed, so dict8 copied the result instead of pasting it."
         case let .transcriptionAndAudioCleanupFailed(error):

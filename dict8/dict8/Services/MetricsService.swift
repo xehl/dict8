@@ -9,7 +9,6 @@ nonisolated enum DictationIssueCategory: String, Codable, Equatable, Sendable {
     case transcriptionFailure
     case transcriptionFallback
     case cleanupRawFallback
-    case cleanupModelFallback
     case focusChanged
     case pasteFailure
     case temporaryAudioCleanupFailure
@@ -20,7 +19,6 @@ nonisolated enum DictationIssueCategory: String, Codable, Equatable, Sendable {
         case .transcriptionFailure: "Transcription failure"
         case .transcriptionFallback: "Transcription fallback used"
         case .cleanupRawFallback: "Raw transcript fallback"
-        case .cleanupModelFallback: "Cleanup fallback model used"
         case .focusChanged: "Copied because focus changed"
         case .pasteFailure: "Paste failure"
         case .temporaryAudioCleanupFailure: "Temporary audio cleanup failure"

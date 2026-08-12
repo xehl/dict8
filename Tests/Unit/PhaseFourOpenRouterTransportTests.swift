@@ -309,6 +309,75 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
         XCTAssertEqual(requestCount, 0)
     }
 
+    func testSingleModelExecuteSendsAutoRouterPluginAndMakesExactlyOneAttempt() async throws {
+        let secret = "generated-\(UUID().uuidString)"
+        let transport = StubOpenRouterTransport(outcomes: [.response(status: 200, body: successBody)])
+        let client = makeClient(key: secret, transport: transport)
+
+        let response = try await client.execute(
+            syntheticRequest(),
+            model: "openrouter/auto",
+            autoRouter: AutoRouterSettings(costTier: .low),
+            deadline: .seconds(1)
+        )
+        let capturedRequests = await transport.requests()
+        let sent = try XCTUnwrap(capturedRequests.first)
+        let body = try jsonObject(sent.httpBody)
+        let provider = try XCTUnwrap(body["provider"] as? [String: Any])
+        let plugins = try XCTUnwrap(body["plugins"] as? [[String: Any]])
+
+        XCTAssertEqual(sent.value(forHTTPHeaderField: "Authorization"), "Bearer \(secret)")
+        XCTAssertEqual(body["model"] as? String, "openrouter/auto")
+        XCTAssertEqual(provider["zdr"] as? Bool, true)
+        XCTAssertEqual(plugins.first?["id"] as? String, "auto-router")
+        XCTAssertEqual(plugins.first?["cost_tier"] as? String, "low")
+        XCTAssertEqual(response.model, "openrouter/auto")
+        XCTAssertEqual(response.attemptNumber, 1)
+        XCTAssertEqual(capturedRequests.count, 1)
+    }
+
+    func testSingleModelExecuteDoesNotFallBackOnEligibleTransientFailure() async throws {
+        let transport = StubOpenRouterTransport(outcomes: [
+            .response(status: 503, body: errorBody(errorType: "provider_overloaded")),
+        ])
+        let client = makeClient(transport: transport)
+
+        await assertClientError(.zdrUnavailable) {
+            try await client.execute(
+                syntheticRequest(),
+                model: "openrouter/auto",
+                autoRouter: nil,
+                deadline: .seconds(1)
+            )
+        }
+        let requestCount = await transport.requests().count
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testSingleModelExecuteRejectsEmptyModelAndNonPositiveDeadline() async throws {
+        let transport = StubOpenRouterTransport(outcomes: [])
+        let client = makeClient(transport: transport)
+
+        await assertClientError(.invalidRequest) {
+            try await client.execute(
+                syntheticRequest(),
+                model: "",
+                autoRouter: nil,
+                deadline: .seconds(1)
+            )
+        }
+        await assertClientError(.invalidRequest) {
+            try await client.execute(
+                syntheticRequest(),
+                model: "openrouter/auto",
+                autoRouter: nil,
+                deadline: .zero
+            )
+        }
+        let requestCount = await transport.requests().count
+        XCTAssertEqual(requestCount, 0)
+    }
+
     func testErrorsNeverExposeSecretRequestOrResponseContent() async throws {
         let secret = "secret-\(UUID().uuidString)"
         let echoedResponse = Data(

@@ -10,7 +10,6 @@ nonisolated struct TextCleanupUsage: Equatable, Sendable {
 nonisolated struct TextCleanupResult: Equatable, Sendable {
     let text: String
     let model: String
-    let usedFallback: Bool
     let latency: Duration
     let usage: TextCleanupUsage?
 }
@@ -150,20 +149,27 @@ nonisolated struct CleanupOutputValidator: Sendable {
 actor OpenRouterTextCleanupService: TextCleanupProviding {
     static let defaultDeadline: Duration = .seconds(30)
     static let temperature = 0.1
+    /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
+    /// OpenRouter's Auto Router at the "low" cost tier instead of a pinned
+    /// primary model plus one explicit dict8-side fallback.
+    static let autoRouterSettings = AutoRouterSettings(costTier: .low)
 
     private let transport: any OpenRouterTransporting
-    private let models: AIModelPair
+    private let model: String
+    private let autoRouter: AutoRouterSettings?
     private let deadline: Duration
     private let validator: CleanupOutputValidator
 
     init(
         transport: any OpenRouterTransporting,
-        models: AIModelPair = AIModelConfiguration.phaseZeroVerified.cleanup,
+        model: String = AIModelConfiguration.phaseZeroVerified.cleanupModel,
+        autoRouter: AutoRouterSettings? = OpenRouterTextCleanupService.autoRouterSettings,
         deadline: Duration = OpenRouterTextCleanupService.defaultDeadline,
         validator: CleanupOutputValidator = CleanupOutputValidator()
     ) {
         self.transport = transport
-        self.models = models
+        self.model = model
+        self.autoRouter = autoRouter
         self.deadline = deadline
         self.validator = validator
     }
@@ -196,7 +202,8 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         do {
             response = try await transport.execute(
                 OpenRouterRequest(endpoint: .chatCompletions, body: body),
-                models: models,
+                model: model,
+                autoRouter: autoRouter,
                 deadline: deadline
             )
         } catch let error as OpenRouterClientError {
@@ -227,7 +234,6 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         return TextCleanupResult(
             text: text,
             model: response.model,
-            usedFallback: response.usedFallback,
             latency: response.latency,
             usage: decoded.usage?.validated
         )

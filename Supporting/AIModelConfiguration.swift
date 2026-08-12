@@ -8,21 +8,18 @@ nonisolated struct AIModelPair: Equatable, Sendable {
 nonisolated struct AIModelConfiguration: Equatable, Sendable {
     let transcriptionModel: String
     let transcriptionFallbackModel: String
+    /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup uses OpenRouter's
+    /// Auto Router as its sole explicit model attempt instead of a pinned
+    /// primary model plus one dict8-side fallback.
     let cleanupModel: String
-    let cleanupFallbackModel: String
 
     static let phaseZeroVerified = AIModelConfiguration(
         transcriptionModel: "openai/whisper-large-v3",
         transcriptionFallbackModel: "google/chirp-3",
-        cleanupModel: "google/gemini-2.5-flash-lite",
-        cleanupFallbackModel: "anthropic/claude-haiku-4.5"
+        cleanupModel: "openrouter/auto"
     )
 
     var transcription: AIModelPair {
         AIModelPair(primary: transcriptionModel, fallback: transcriptionFallbackModel)
-    }
-
-    var cleanup: AIModelPair {
-        AIModelPair(primary: cleanupModel, fallback: cleanupFallbackModel)
     }
 }

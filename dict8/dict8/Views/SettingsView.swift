@@ -246,10 +246,6 @@ struct SettingsView: View {
                 if let metadata = appState.cleanupTestMetadata {
                     LabeledContent("Cleanup model", value: metadata.model)
                     LabeledContent(
-                        "Model attempt",
-                        value: metadata.usedFallback ? "Explicit fallback" : "Primary"
-                    )
-                    LabeledContent(
                         "Request latency",
                         value: metadata.latencySeconds
                             .formatted(.number.precision(.fractionLength(3))) + " s"
@@ -406,7 +402,10 @@ struct SettingsView: View {
                 LabeledContent("Transcription", value: models.transcriptionModel)
                 LabeledContent("Transcription fallback", value: models.transcriptionFallbackModel)
                 LabeledContent("Cleanup", value: models.cleanupModel)
-                LabeledContent("Cleanup fallback", value: models.cleanupFallbackModel)
+                LabeledContent(
+                    "Cleanup routing",
+                    value: "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
+                )
             }
 
             if let lastError = appState.lastError {

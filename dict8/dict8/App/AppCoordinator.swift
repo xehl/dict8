@@ -625,8 +625,8 @@ final class AppCoordinator {
                 guard self.cleanupGeneration == generation else { return }
                 self.state.setCleanupTestOutput(result.text)
                 self.state.setCleanupTestMetadata(CleanupTestMetadata(result))
-                self.state.setCleanupTestStatus(.cleaned(usedFallback: result.usedFallback))
-                self.state.setStatus(result.usedFallback ? .warning : .completed)
+                self.state.setCleanupTestStatus(.cleaned)
+                self.state.setStatus(.completed)
                 self.state.clearError()
                 self.scheduleCleanupTestExpiration()
             } catch is CancellationError {
@@ -936,18 +936,13 @@ final class AppCoordinator {
         state.setStatus(.cleaning)
         let cleanupStart = clock.now
         var finalText = transcription.text
-        var cleanupResult: TextCleanupResult?
         var cleanupFailure: TextCleanupError?
         do {
             let result = try await textCleanup.clean(transcription.text)
             cleanupDuration = cleanupStart.duration(to: clock.now)
             try Task.checkCancellation()
-            cleanupResult = result
             finalText = result.text
             cleanupCost = result.usage?.cost
-            if result.usedFallback {
-                hud.showFeedback(.cleanupFallbackUsed)
-            }
         } catch is CancellationError {
             cleanupDuration = cleanupStart.duration(to: clock.now)
             finishCancelledPipeline(generation: generation)
@@ -1017,8 +1012,6 @@ final class AppCoordinator {
             .focusChangedCopied
         } else if let cleanupFailure {
             .cleanupFailed(cleanupFailure)
-        } else if cleanupResult?.usedFallback == true {
-            .cleanupFallbackUsed
         } else if transcription.usedFallback {
             .transcriptionFallbackUsed
         } else if cueFailed {
@@ -1473,8 +1466,6 @@ final class AppCoordinator {
             .focusChanged
         case .cleanupFailed:
             .cleanupRawFallback
-        case .cleanupFallbackUsed:
-            .cleanupModelFallback
         case .transcriptionFallbackUsed:
             .transcriptionFallback
         case .recordingCueFailed:

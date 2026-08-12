@@ -142,8 +142,8 @@ Latency targets are directional because network and model latency vary; they are
 - On exhausted cleanup failure, paste the raw transcript and show a non-blocking warning.
 - Treat transcript content as dictated text, never as instructions to the cleanup model.
 - Reject suspicious cleanup results, including substantial unexplained expansion, commentary, Markdown fences, or obvious instruction-following, and fall back to the raw transcript.
-- Try the pinned cleanup model first and at most one explicitly configured ZDR-compatible fallback on eligible availability or transient failures.
-- Notify the user when a fallback model was required, even if processing ultimately succeeds.
+- Send the request to OpenRouter's Auto Router (`model: "openrouter/auto"`) as the sole explicit model attempt. This is an approved exception to the one-pinned-model-plus-one-fallback rule (see §8); there is no dict8-side cleanup model fallback. A failure on this attempt is handled as an ordinary cleanup failure per the rule above, not retried against a different model.
+- Continue sending `provider.zdr: true` on every cleanup request regardless of routing.
 
 The cleanup provider uses a system message separate from the raw transcript user message and a low temperature. The initial prompt is:
 
@@ -268,7 +268,9 @@ The coordinator owns this pipeline and depends on protocols for recording, trans
 
 Each stage makes at most two model attempts total: the pinned model and one configured fallback. Fallback is eligible for model/provider unavailability, timeouts, rate limits, and transient server or network failures. Authentication, insufficient credits, invalid requests, unsupported media, oversized payloads, decoding errors, secure-field refusal, and invalid successful output do not trigger model fallback. Respect a reasonable `Retry-After` value without exceeding the stage deadline.
 
-Within either explicit model attempt, OpenRouter may route across provider endpoints for that same model. Account-level OpenAI and Google ZDR settings restrict STT routes; cleanup additionally sets `provider.zdr: true`. dict8 does not use OpenRouter's automatic multi-model routing; it owns the single model fallback so fallback state and notification behavior remain explicit.
+Within either explicit model attempt, OpenRouter may route across provider endpoints for that same model. Account-level OpenAI and Google ZDR settings restrict STT routes; cleanup additionally sets `provider.zdr: true`. dict8 does not use OpenRouter's automatic multi-model routing for STT; STT owns its single explicit model fallback so fallback state and notification behavior remain explicit.
+
+**Approved exception — cleanup uses the OpenRouter Auto Router (approved 2026-08-12):** The cleanup stage sends `model: "openrouter/auto"` (OpenRouter's Auto Router, https://openrouter.ai/docs/features/model-routing) as its sole model attempt, rather than a dict8-pinned primary model plus one explicit fallback. `provider.zdr: true` continues to be sent with every cleanup request; the Auto Router documentation states account-level ZDR policy is honored ahead of candidate selection. Cleanup therefore makes exactly one explicit model attempt per request; there is no second dict8-side model fallback for this stage, and a transient failure on that single attempt is handled by existing cleanup-failure behavior (raw transcript pastes) rather than a local retry-with-different-model. This exception is scoped to cleanup only — STT keeps its pinned primary/fallback pair per §6.3 and the rule above.
 
 Model identifiers live in one configuration type. They must be verified against current OpenRouter documentation at implementation time; this document intentionally does not invent model slugs.
 

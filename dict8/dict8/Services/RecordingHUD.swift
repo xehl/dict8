@@ -9,7 +9,6 @@ enum TransientFeedback: Equatable, Sendable {
     case secureFieldRefused
     case recordingCueFailed
     case transcriptionFallbackUsed
-    case cleanupFallbackUsed
     case cleanupRawFallback
     case temporaryAudioCleanupFailed
 
@@ -21,7 +20,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .recordingLimitReached: "timer"
         case .secureFieldRefused: "lock.fill"
         case .recordingCueFailed: "speaker.slash"
-        case .transcriptionFallbackUsed, .cleanupFallbackUsed: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .transcriptionFallbackUsed: "arrow.trianglehead.2.clockwise.rotate.90"
         case .cleanupRawFallback: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
         case .temporaryAudioCleanupFailed: "trash.slash"
         }
@@ -36,7 +35,6 @@ enum TransientFeedback: Equatable, Sendable {
         case .secureFieldRefused: "Recording blocked in secure field"
         case .recordingCueFailed: "Recording cue failed — processing continued"
         case .transcriptionFallbackUsed: "Transcription fallback model used"
-        case .cleanupFallbackUsed: "Cleanup fallback model used"
         case .cleanupRawFallback: "Cleanup failed — pasted raw transcript"
         case .temporaryAudioCleanupFailed: "Temporary audio could not be deleted"
         }
