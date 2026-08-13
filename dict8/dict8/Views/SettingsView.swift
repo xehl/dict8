@@ -17,7 +17,7 @@ struct SettingsView: View {
                 #endif
             }
             .formStyle(.grouped)
-            .frame(width: 352)
+            .frame(width: 352, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -30,7 +30,7 @@ struct SettingsView: View {
                 #endif
             }
             .formStyle(.grouped)
-            .frame(width: 352)
+            .frame(width: 352, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -40,10 +40,10 @@ struct SettingsView: View {
                 lastIssueSection
             }
             .formStyle(.grouped)
-            .frame(width: 352)
+            .frame(width: 352, height: columnHeight, alignment: .top)
             .padding(.trailing, 16)
         }
-        .frame(width: 1088, height: 780)
+        .frame(width: 1088, height: columnHeight)
         .onAppear {
             coordinator.refreshConfiguration()
         }
@@ -58,6 +58,12 @@ struct SettingsView: View {
             coordinator.closeSettingsValidation()
         }
     }
+
+    /// Fixed height shared by all three columns so their forms line up
+    /// evenly regardless of which column's content happens to be tallest;
+    /// the shortest columns get trailing empty space instead of the window
+    /// resizing to their content.
+    private let columnHeight: CGFloat = 780
 
     @ViewBuilder
     private var generalSection: some View {
