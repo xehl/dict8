@@ -407,6 +407,10 @@ final class AppCoordinator {
 
         do {
             let recording = try audioRecorder.stop()
+            guard recording.duration >= SystemAudioRecordingService.minimumDuration else {
+                discardBriefRecording(recording, generation: generation)
+                return
+            }
             if let target = recordingOriginatingTarget {
                 recordingOriginatingTarget = nil
                 startProductionPipeline(
@@ -424,6 +428,25 @@ final class AppCoordinator {
             recordingOriginatingTarget = nil
             state.setError(.recordingEncodingFailed)
         }
+    }
+
+    /// Handles a recording shorter than `SystemAudioRecordingService.minimumDuration`:
+    /// an accidental or near-instant chord tap with essentially no speech.
+    /// Sending audio this short to the STT model reliably produces filler
+    /// hallucinations (e.g. "Thank you" for silence), so it is discarded
+    /// before transcription — no paste, no error, no HUD feedback, just a
+    /// quiet return to idle, matching the deliberate-cancellation path.
+    private func discardBriefRecording(_ recording: RecordedAudioFile, generation: Int) {
+        do {
+            try audioRecorder.delete(recording)
+        } catch {
+            state.setWarning(.temporaryAudioCleanupFailed)
+        }
+        recordingOriginatingTarget = nil
+        if audioGeneration == generation {
+            state.setAudioTestStatus(.idle)
+        }
+        state.setStatus(.idle)
     }
 
     func cancelTestRecording() {

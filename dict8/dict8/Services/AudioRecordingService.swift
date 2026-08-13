@@ -130,6 +130,12 @@ final class SystemAudioRecordingService: AudioRecording {
     typealias RecorderFactory = (URL, [String: Any]) throws -> any AudioRecorderDriving
 
     static let maximumDuration: TimeInterval = 180
+    /// Recordings shorter than this are treated as an accidental/near-instant
+    /// chord tap rather than real speech. Below this duration there is
+    /// essentially no speech signal, and sending the near-silent audio to
+    /// the STT model reliably produces filler hallucinations (e.g. Whisper
+    /// returning "Thank you" for silence) that would otherwise get pasted.
+    static let minimumDuration: TimeInterval = 0.5
     static let sampleRate = 16_000.0
     static let channelCount = 1
     static let bitRate = 32_000

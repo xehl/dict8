@@ -231,6 +231,23 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertTrue(harness.hud.feedback.contains(.recordingCueFailed))
     }
 
+    func testBriefRecordingIsDiscardedWithoutTranscriptionOrPaste() async {
+        let harness = PipelineHarness(recordedDuration: 0.2)
+
+        await runDictation(harness)
+        await waitUntil { harness.state.status == .idle }
+
+        XCTAssertTrue(harness.paste.texts.isEmpty)
+        XCTAssertNil(harness.cache.value())
+        let transcriptionCalls = await harness.transcription.callCount()
+        XCTAssertEqual(transcriptionCalls, 0)
+        let cleanupCalls = await harness.cleanup.callCount()
+        XCTAssertEqual(cleanupCalls, 0)
+        XCTAssertEqual(harness.recorder.deleteCount, 1)
+        XCTAssertNil(harness.state.lastError)
+        XCTAssertEqual(harness.metrics.snapshot.requestCount, 0)
+    }
+
     private func runDictation(_ harness: PipelineHarness) async {
         harness.monitor.onPushToTalkPressed?()
         await waitUntil { harness.recorder.isRecording }
@@ -308,11 +325,15 @@ private final class PipelineHarness {
         ),
         transcriptionDelay: Duration = .zero,
         deleteFailuresBeforeSuccess: Int = 0,
-        stopCueFails: Bool = false
+        stopCueFails: Bool = false,
+        recordedDuration: TimeInterval = 2
     ) {
         let suite = "PhaseEightPipelineTests.\(UUID().uuidString)"
         state = AppState(defaults: UserDefaults(suiteName: suite) ?? .standard)
-        recorder = PipelineRecorder(deleteFailuresBeforeSuccess: deleteFailuresBeforeSuccess)
+        recorder = PipelineRecorder(
+            deleteFailuresBeforeSuccess: deleteFailuresBeforeSuccess,
+            recordedDuration: recordedDuration
+        )
         playback = PipelinePlayback(stopCueFails: stopCueFails)
         transcription = PipelineTranscription(
             result: transcriptionResult,
@@ -392,16 +413,17 @@ private final class PipelineRecorder: AudioRecording {
     private(set) var startCount = 0
     private(set) var deleteCount = 0
     private let deleteFailuresBeforeSuccess: Int
-    private let recording = RecordedAudioFile(
-        url: URL(fileURLWithPath: "/tmp/synthetic-phase-eight.m4a"),
-        duration: 2,
-        sampleRate: 16_000,
-        channelCount: 1,
-        bitRate: 32_000
-    )
+    private let recording: RecordedAudioFile
 
-    init(deleteFailuresBeforeSuccess: Int) {
+    init(deleteFailuresBeforeSuccess: Int, recordedDuration: TimeInterval = 2) {
         self.deleteFailuresBeforeSuccess = deleteFailuresBeforeSuccess
+        self.recording = RecordedAudioFile(
+            url: URL(fileURLWithPath: "/tmp/synthetic-phase-eight.m4a"),
+            duration: recordedDuration,
+            sampleRate: 16_000,
+            channelCount: 1,
+            bitRate: 32_000
+        )
     }
 
     func start() throws {
