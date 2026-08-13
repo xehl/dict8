@@ -147,7 +147,11 @@ nonisolated struct CleanupOutputValidator: Sendable {
 }
 
 actor OpenRouterTextCleanupService: TextCleanupProviding {
-    static let defaultDeadline: Duration = .seconds(30)
+    /// Lowered from 30s (approved 2026-08-13, AGENTS.md §4/PRD.md §6.4): cleanup
+    /// is a low-stakes "lightly punctuate this" task, so failing fast into the
+    /// raw-transcript fallback path is preferred over waiting out a slow
+    /// Auto Router pick.
+    static let defaultDeadline: Duration = .seconds(10)
     static let temperature = 0.1
     /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
     /// OpenRouter's Auto Router at the "low" cost tier instead of a pinned
@@ -239,8 +243,11 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         )
     }
 
+    /// Cap lowered from 2,048 (approved 2026-08-13, AGENTS.md §4/PRD.md §6.4):
+    /// cleanup output should never be much longer than "Me but punctuated"
+    /// input, so the worst-case generation cap has slack to tighten.
     nonisolated static func outputTokenLimit(for transcript: String) -> Int {
-        min(2_048, max(64, (transcript.utf8.count + 2) / 3 + 32))
+        min(1_024, max(48, (transcript.utf8.count + 2) / 3 + 32))
     }
 
     nonisolated static let systemPrompt = """

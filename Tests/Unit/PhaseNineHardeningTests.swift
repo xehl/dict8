@@ -21,7 +21,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 transcriptionCost: 0.003,
                 cleanupCost: 0.000_02,
                 usedRawCleanupFallback: true,
-                issueCategory: .cleanupRawFallback
+                issueCategory: .cleanupRawFallback,
+                cleanupFailureReason: .transportDeadlineExceeded
             )
         )
         _ = try store.recordStarted(audioSeconds: 30)
@@ -34,7 +35,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 transcriptionCost: nil,
                 cleanupCost: nil,
                 usedRawCleanupFallback: false,
-                issueCategory: .transcriptionFailure
+                issueCategory: .transcriptionFailure,
+                cleanupFailureReason: nil
             )
         )
         _ = try store.recordStarted(audioSeconds: 10)
@@ -85,7 +87,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 transcriptionCost: nil,
                 cleanupCost: nil,
                 usedRawCleanupFallback: false,
-                issueCategory: nil
+                issueCategory: nil,
+                cleanupFailureReason: nil
             )
         )
 

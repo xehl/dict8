@@ -26,7 +26,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(execution.request.endpoint, .chatCompletions)
         XCTAssertEqual(execution.model, model)
         XCTAssertEqual(execution.autoRouter, OpenRouterTextCleanupService.autoRouterSettings)
-        XCTAssertEqual(execution.deadline, .seconds(30))
+        XCTAssertEqual(execution.deadline, .seconds(10))
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0]["role"] as? String, "system")
         XCTAssertEqual(messages[0]["content"] as? String, OpenRouterTextCleanupService.systemPrompt)
@@ -52,14 +52,14 @@ final class PhaseSixTextCleanupTests: XCTestCase {
     }
 
     func testOutputTokenLimitIsTranscriptSizedAndClamped() {
-        XCTAssertEqual(OpenRouterTextCleanupService.outputTokenLimit(for: "short"), 64)
+        XCTAssertEqual(OpenRouterTextCleanupService.outputTokenLimit(for: "short"), 48)
         XCTAssertEqual(
             OpenRouterTextCleanupService.outputTokenLimit(for: String(repeating: "a", count: 300)),
             132
         )
         XCTAssertEqual(
             OpenRouterTextCleanupService.outputTokenLimit(for: String(repeating: "a", count: 10_000)),
-            2_048
+            1_024
         )
     }
 

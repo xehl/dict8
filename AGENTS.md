@@ -146,6 +146,7 @@ Approved v0 additions:
   * `provider.zdr: true` is still sent on every cleanup request, unchanged; per OpenRouter's Auto Router docs, account-level model/provider restrictions, guardrails, and ZDR policy are honored by the router before it selects a candidate.
   * The "notify user when a fallback model was required" cleanup behavior no longer applies, because dict8 does not select or know about the router's internal fallback; only the responding model's identity (already returned in `response.model`) is available and may still be used for content-free metrics.
   * This exception is scoped to the cleanup stage only. It does not apply to STT, and it does not authorize automatic/multi-model routing for any other stage without a separate explicit approval.
+* **Approved exception — cleanup stage deadline and output cap lowered (approved 2026-08-13):** Cleanup's request deadline is 10 seconds (lowered from the original 30 seconds) and its `max_completion_tokens` cap is 1,024 (lowered from 2,048), with the per-input floor lowered from 64 to 48. Rationale: cleanup is a "lightly punctuate this" task whose output should never be much longer than the input, so both the worst-case generation time and the failure-detection latency have slack to tighten; failing faster into the existing raw-transcript-fallback path is preferred over waiting out a slow Auto Router pick. This does not change STT's deadline or token limits, and it does not authorize combining a same-model retry with fallback beyond the existing per-stage attempt cap.
 
 ## 5. Architecture rules
 

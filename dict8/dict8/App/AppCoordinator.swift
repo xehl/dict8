@@ -816,6 +816,7 @@ final class AppCoordinator {
         var transcriptionCost: Double?
         var cleanupCost: Double?
         var usedRawCleanupFallback = false
+        var cleanupFailureForMetrics: TextCleanupError?
 
         defer {
             hud.finishProcessing()
@@ -841,7 +842,8 @@ final class AppCoordinator {
                         transcriptionCost: transcriptionCost,
                         cleanupCost: cleanupCost,
                         usedRawCleanupFallback: usedRawCleanupFallback,
-                        issueCategory: metricIssue
+                        issueCategory: metricIssue,
+                        cleanupFailureReason: cleanupFailureForMetrics.map(CleanupFailureReason.init(cleanupError:))
                     )
                 )
             }
@@ -954,6 +956,7 @@ final class AppCoordinator {
                 return
             }
             cleanupFailure = error
+            cleanupFailureForMetrics = error
             usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
         } catch {
@@ -963,6 +966,7 @@ final class AppCoordinator {
                 return
             }
             cleanupFailure = .transport(.networkFailure)
+            cleanupFailureForMetrics = .transport(.networkFailure)
             usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
         }
