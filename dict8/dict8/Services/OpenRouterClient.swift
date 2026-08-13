@@ -372,6 +372,11 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // App attribution (https://openrouter.ai/docs/app-attribution): HTTP-Referer
+        // is required to create dict8's app page in OpenRouter's rankings/console;
+        // X-OpenRouter-Title sets the display name and must be paired with it.
+        urlRequest.setValue("https://github.com/xehl/dict8", forHTTPHeaderField: "HTTP-Referer")
+        urlRequest.setValue("dict8", forHTTPHeaderField: "X-OpenRouter-Title")
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         return urlRequest
     }
