@@ -214,45 +214,72 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             throw TextCleanupError.requestEncodingFailed
         }
 
-        let response: OpenRouterResponse
-        do {
-            response = try await transport.execute(
-                OpenRouterRequest(endpoint: .chatCompletions, body: body),
-                model: model,
-                autoRouter: autoRouter,
-                deadline: deadline
+        let clock = ContinuousClock()
+        let deadlineInstant = clock.now.advanced(by: deadline)
+
+        // Approved exception (AGENTS.md §20, PRD.md §8, 2026-08-13): a
+        // zero-completion response (empty `choices` / nil content) arrives
+        // as an ordinary HTTP 200 and is covered by OpenRouter's Zero
+        // Completion Insurance, so it is never billed — retrying costs
+        // nothing extra. Because dict8 does not send a `session_id` for
+        // cleanup, the Auto Router re-ranks from scratch on the retry and
+        // will typically land on a different underlying model, unlike a
+        // same-model retry. This is a single same-request retry scoped to
+        // this one failure class within the existing stage deadline; it
+        // does not add a second explicit model attempt (still one call to
+        // "openrouter/auto-beta") and does not apply to any other cleanup
+        // failure or to STT.
+        for attempt in 1...2 {
+            try Task.checkCancellation()
+            let remaining = clock.now.duration(to: deadlineInstant)
+            guard remaining > .zero else {
+                throw TextCleanupError.transport(.deadlineExceeded)
+            }
+
+            let response: OpenRouterResponse
+            do {
+                response = try await transport.execute(
+                    OpenRouterRequest(endpoint: .chatCompletions, body: body),
+                    model: model,
+                    autoRouter: autoRouter,
+                    deadline: remaining
+                )
+            } catch let error as OpenRouterClientError {
+                throw TextCleanupError.transport(error)
+            } catch is CancellationError {
+                throw TextCleanupError.transport(.cancelled)
+            } catch {
+                throw TextCleanupError.transport(.networkFailure)
+            }
+
+            let decoded: CleanupResponse
+            do {
+                decoded = try JSONDecoder().decode(CleanupResponse.self, from: response.data)
+            } catch {
+                throw TextCleanupError.malformedResponse
+            }
+            guard let choice = decoded.choices.first,
+                  let content = choice.message.content else {
+                if attempt == 1 {
+                    continue
+                }
+                throw TextCleanupError.missingChoice
+            }
+            guard choice.finishReason == "stop" else {
+                throw choice.finishReason == "length"
+                    ? TextCleanupError.incompleteOutput
+                    : TextCleanupError.unexpectedFinishReason(choice.finishReason)
+            }
+            let text = try validator.validate(output: content, against: input)
+
+            return TextCleanupResult(
+                text: text,
+                model: response.model,
+                latency: response.latency,
+                usage: decoded.usage?.validated
             )
-        } catch let error as OpenRouterClientError {
-            throw TextCleanupError.transport(error)
-        } catch is CancellationError {
-            throw TextCleanupError.transport(.cancelled)
-        } catch {
-            throw TextCleanupError.transport(.networkFailure)
         }
-
-        let decoded: CleanupResponse
-        do {
-            decoded = try JSONDecoder().decode(CleanupResponse.self, from: response.data)
-        } catch {
-            throw TextCleanupError.malformedResponse
-        }
-        guard let choice = decoded.choices.first,
-              let content = choice.message.content else {
-            throw TextCleanupError.missingChoice
-        }
-        guard choice.finishReason == "stop" else {
-            throw choice.finishReason == "length"
-                ? TextCleanupError.incompleteOutput
-                : TextCleanupError.unexpectedFinishReason(choice.finishReason)
-        }
-        let text = try validator.validate(output: content, against: input)
-
-        return TextCleanupResult(
-            text: text,
-            model: response.model,
-            latency: response.latency,
-            usage: decoded.usage?.validated
-        )
+        throw TextCleanupError.missingChoice
     }
 
     /// Cap lowered from 2,048 (approved 2026-08-13, AGENTS.md §4/PRD.md §6.4):

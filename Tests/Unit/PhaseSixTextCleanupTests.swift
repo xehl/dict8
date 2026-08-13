@@ -26,7 +26,12 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(execution.request.endpoint, .chatCompletions)
         XCTAssertEqual(execution.model, model)
         XCTAssertEqual(execution.autoRouter, OpenRouterTextCleanupService.autoRouterSettings)
-        XCTAssertEqual(execution.deadline, .seconds(10))
+        // The deadline passed to transport is the remaining time computed
+        // from a ContinuousClock at call time (to support the zero-
+        // completion retry's shared budget), so it is slightly under the
+        // nominal 10s rather than exactly equal.
+        XCTAssertLessThanOrEqual(execution.deadline, .seconds(10))
+        XCTAssertGreaterThan(execution.deadline, .seconds(9))
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0]["role"] as? String, "system")
         XCTAssertEqual(messages[0]["content"] as? String, OpenRouterTextCleanupService.systemPrompt)
@@ -151,6 +156,45 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         await assertCleanupError(.transport(.insufficientCredits)) {
             try await service.clean("synthetic cleanup input")
         }
+    }
+
+    func testZeroCompletionRetriesOnceAndSucceedsOnSecondAttempt() async throws {
+        let emptyChoices = OpenRouterResponse(
+            data: Data(#"{"choices":[]}"#.utf8),
+            model: model,
+            attemptNumber: 1,
+            latency: .milliseconds(25)
+        )
+        let transport = CleanupTransportStub(
+            results: [
+                .success(emptyChoices),
+                .success(response(text: "We should move the meeting to Thursday.")),
+            ]
+        )
+        let service = makeService(transport: transport)
+
+        let result = try await service.clean("we should move the meeting to thursday")
+
+        XCTAssertEqual(result.text, "We should move the meeting to Thursday.")
+        let executions = await transport.executions()
+        XCTAssertEqual(executions.count, 2)
+    }
+
+    func testZeroCompletionOnBothAttemptsStillThrowsMissingChoice() async {
+        let emptyChoices = OpenRouterResponse(
+            data: Data(#"{"choices":[]}"#.utf8),
+            model: model,
+            attemptNumber: 1,
+            latency: .milliseconds(25)
+        )
+        let transport = CleanupTransportStub(results: [.success(emptyChoices), .success(emptyChoices)])
+        let service = makeService(transport: transport)
+
+        await assertCleanupError(.missingChoice) {
+            try await service.clean("keep these words exactly here")
+        }
+        let executions = await transport.executions()
+        XCTAssertEqual(executions.count, 2)
     }
 
     func testValidatorAllowsLightCleanupAndPromptInjectionAsDictatedText() throws {
@@ -328,11 +372,15 @@ private actor CleanupTransportStub: OpenRouterTransporting {
         let deadline: Duration
     }
 
-    private let result: Result<OpenRouterResponse, OpenRouterClientError>
+    private var results: [Result<OpenRouterResponse, OpenRouterClientError>]
     private var captured: [Execution] = []
 
     init(result: Result<OpenRouterResponse, OpenRouterClientError>) {
-        self.result = result
+        self.results = [result]
+    }
+
+    init(results: [Result<OpenRouterResponse, OpenRouterClientError>]) {
+        self.results = results
     }
 
     func execute(
@@ -340,7 +388,7 @@ private actor CleanupTransportStub: OpenRouterTransporting {
         models: AIModelPair,
         deadline: Duration
     ) throws -> OpenRouterResponse {
-        try result.get()
+        try results[0].get()
     }
 
     func execute(
@@ -350,7 +398,8 @@ private actor CleanupTransportStub: OpenRouterTransporting {
         deadline: Duration
     ) throws -> OpenRouterResponse {
         captured.append(Execution(request: request, model: model, autoRouter: autoRouter, deadline: deadline))
-        return try result.get()
+        let index = min(captured.count - 1, results.count - 1)
+        return try results[index].get()
     }
 
     func executions() -> [Execution] { captured }

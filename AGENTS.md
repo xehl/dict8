@@ -608,7 +608,7 @@ Do not retry:
 * Unsupported media
 * Oversized payloads
 * Decoding failures
-* Empty successful responses
+* Empty successful responses, **except** the cleanup-stage zero-completion accommodation below
 * Permission errors
 * Local recording-state errors
 * Paste failures
@@ -616,6 +616,13 @@ Do not retry:
 Keep attempt and fallback behavior in the shared API client or one shared request-execution layer.
 
 Do not duplicate retry logic across providers.
+
+**Approved exception — cleanup zero-completion retry accommodation (approved 2026-08-13):** The cleanup stage may retry once, within the same stage deadline and using the same single Auto Router Beta request (`openrouter/auto-beta`), when a response decodes successfully but has an empty `choices` array or a `nil` message content (dict8's `missingChoice` case). Rationale:
+
+* OpenRouter's Zero Completion Insurance means a response with no output tokens and a blank/error finish state is never billed, so this retry adds no cost exposure.
+* Cleanup does not send a `session_id`, so the Auto Router re-ranks candidates from scratch on the retried request and typically lands on a different underlying model rather than repeating the same failure.
+* This is a single same-request retry, not a second explicit model attempt: it does not add a fallback model, does not apply to any other cleanup failure class (malformed response, unexpected finish reason, incomplete output), and does not apply to STT.
+* If the retry also returns an empty choice, cleanup fails with `missingChoice` as before and the coordinator pastes the raw transcript per existing failure behavior.
 
 ## 21. Metrics
 
