@@ -248,6 +248,23 @@ final class PhaseEightPipelineTests: XCTestCase {
         XCTAssertEqual(harness.metrics.snapshot.requestCount, 0)
     }
 
+    func testSilentRecordingIsDiscardedWithoutTranscriptionOrPaste() async {
+        let harness = PipelineHarness(recordedDuration: 3, isSilent: true)
+
+        await runDictation(harness)
+        await waitUntil { harness.state.status == .idle }
+
+        XCTAssertTrue(harness.paste.texts.isEmpty)
+        XCTAssertNil(harness.cache.value())
+        let transcriptionCalls = await harness.transcription.callCount()
+        XCTAssertEqual(transcriptionCalls, 0)
+        let cleanupCalls = await harness.cleanup.callCount()
+        XCTAssertEqual(cleanupCalls, 0)
+        XCTAssertEqual(harness.recorder.deleteCount, 1)
+        XCTAssertNil(harness.state.lastError)
+        XCTAssertEqual(harness.metrics.snapshot.requestCount, 0)
+    }
+
     private func runDictation(_ harness: PipelineHarness) async {
         harness.monitor.onPushToTalkPressed?()
         await waitUntil { harness.recorder.isRecording }
@@ -326,7 +343,8 @@ private final class PipelineHarness {
         transcriptionDelay: Duration = .zero,
         deleteFailuresBeforeSuccess: Int = 0,
         stopCueFails: Bool = false,
-        recordedDuration: TimeInterval = 2
+        recordedDuration: TimeInterval = 2,
+        isSilent: Bool = false
     ) {
         let suite = "PhaseEightPipelineTests.\(UUID().uuidString)"
         state = AppState(defaults: UserDefaults(suiteName: suite) ?? .standard)
@@ -354,6 +372,7 @@ private final class PipelineHarness {
             microphonePermission: PipelineMicrophonePermission(),
             audioRecorder: recorder,
             audioPlayback: playback,
+            silenceDetector: PipelineSilenceDetector(isSilent: isSilent),
             speechToText: transcription,
             textCleanup: cleanup,
             pasteService: paste,
@@ -365,6 +384,14 @@ private final class PipelineHarness {
             },
             metricsStore: metrics
         )
+    }
+}
+
+private struct PipelineSilenceDetector: SilenceDetecting {
+    let isSilent: Bool
+
+    func isSilent(_ recording: RecordedAudioFile) async -> Bool {
+        isSilent
     }
 }
 

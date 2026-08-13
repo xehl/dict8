@@ -93,12 +93,67 @@ enum AudioRecordingError: Error, Equatable, Sendable {
     case temporaryFileCleanupFailed
 }
 
-struct RecordedAudioFile: Equatable, Sendable {
+nonisolated struct RecordedAudioFile: Equatable, Sendable {
     let url: URL
     let duration: TimeInterval
     let sampleRate: Double
     let channelCount: Int
     let bitRate: Int
+}
+
+/// Detects whether a finished recording contains no meaningful speech
+/// signal (silence, background noise only, muted microphone) as opposed
+/// to a decode/duration problem, which `RecordedAudioFile`/AudioRecording
+/// already handle. This is distinct from the minimum-duration check: a
+/// multi-second recording can still be entirely silent if the speaker held
+/// the chord without actually speaking, and sending that audio to the STT
+/// model reliably produces filler hallucinations (e.g. "Thank you") since
+/// the model has no real signal to transcribe.
+nonisolated protocol SilenceDetecting: Sendable {
+    func isSilent(_ recording: RecordedAudioFile) async -> Bool
+}
+
+/// Peak-amplitude silence detector: reads the whole recorded file and
+/// checks whether any sample across any channel exceeds a normalized
+/// amplitude threshold. Conversational speech typically peaks well above
+/// -20 dBFS (roughly 0.1 normalized); room noise and true silence rarely
+/// exceed -40 dBFS (roughly 0.01 normalized), so the threshold sits between
+/// the two with margin for quiet speech.
+actor SystemSilenceDetector: SilenceDetecting {
+    static let peakAmplitudeThreshold: Float = 0.02
+
+    func isSilent(_ recording: RecordedAudioFile) async -> Bool {
+        guard let file = try? AVAudioFile(forReading: recording.url),
+              file.length > 0,
+              let buffer = AVAudioPCMBuffer(
+                  pcmFormat: file.processingFormat,
+                  frameCapacity: AVAudioFrameCount(file.length)
+              ) else {
+            // An unreadable or empty file isn't this detector's concern —
+            // let it proceed to transcription, where SpeechToTextError
+            // will surface a clearer, more specific failure.
+            return false
+        }
+
+        do {
+            try file.read(into: buffer)
+        } catch {
+            return false
+        }
+
+        guard let channelData = buffer.floatChannelData else { return false }
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return true }
+
+        var peak: Float = 0
+        for channel in 0..<Int(buffer.format.channelCount) {
+            let samples = channelData[channel]
+            for index in 0..<frameCount {
+                peak = max(peak, abs(samples[index]))
+            }
+        }
+        return peak < Self.peakAmplitudeThreshold
+    }
 }
 
 @MainActor
