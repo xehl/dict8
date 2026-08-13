@@ -244,9 +244,6 @@ struct SettingsView: View {
                 "Startup audio cleanup",
                 value: appState.temporaryAudioMaintenanceStatus.displayName
             )
-
-            Text("Metrics are aggregate and content-free.")
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -295,9 +292,6 @@ struct SettingsView: View {
                 total: metrics.totalReportedCost,
                 perRequest: metrics.averageCostPerRequest
             )
-
-            Text("Reported cost may be partial when OpenRouter omits usage metadata.")
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -532,7 +526,7 @@ private struct LatencyStatRow: View {
     let p95: Double?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.body)
             HStack(spacing: 0) {
@@ -574,7 +568,7 @@ private struct CostStatRow: View {
     let perRequest: Double?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.body)
             HStack(spacing: 0) {
