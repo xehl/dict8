@@ -532,11 +532,23 @@ private struct LatencyStatRow: View {
                 .font(.body)
             HStack(spacing: 0) {
                 LatencyStatCell(caption: "avg", value: average)
+                StatDivider()
                 LatencyStatCell(caption: "p50", value: p50)
+                StatDivider()
                 LatencyStatCell(caption: "p95", value: p95)
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+private struct StatDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(width: 1)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
     }
 }
 
@@ -575,7 +587,9 @@ private struct CostStatRow: View {
                 .font(.body)
             HStack(spacing: 0) {
                 CostStatCell(caption: "total", value: total)
+                StatDivider()
                 CostStatCell(caption: "per request", value: perRequest)
+                StatDivider()
                 CostStatCell(caption: "per audio min", value: perAudioMinute)
                 Spacer()
             }
