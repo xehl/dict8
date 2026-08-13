@@ -23,7 +23,6 @@ final class AppCoordinator {
     private let microphonePermission: any MicrophonePermissionControlling
     private let audioRecorder: any AudioRecording
     private let audioPlayback: any AudioPlaybackProviding
-    private let silenceDetector: any SilenceDetecting
     private let speechToText: any SpeechToTextProviding
     private let textCleanup: any TextCleanupProviding
     private let pasteService: any TextPasting
@@ -63,7 +62,6 @@ final class AppCoordinator {
         microphonePermission: any MicrophonePermissionControlling,
         audioRecorder: any AudioRecording,
         audioPlayback: any AudioPlaybackProviding,
-        silenceDetector: any SilenceDetecting = SystemSilenceDetector(),
         speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService(),
         textCleanup: any TextCleanupProviding = UnavailableTextCleanupService(),
         pasteService: any TextPasting,
@@ -81,7 +79,6 @@ final class AppCoordinator {
         self.microphonePermission = microphonePermission
         self.audioRecorder = audioRecorder
         self.audioPlayback = audioPlayback
-        self.silenceDetector = silenceDetector
         self.speechToText = speechToText
         self.textCleanup = textCleanup
         self.pasteService = pasteService
@@ -420,23 +417,10 @@ final class AppCoordinator {
                 return
             }
             recordingOriginatingTarget = nil
-            audioTask?.cancel()
-            audioTask = Task { @MainActor [weak self] in
-                guard let self else { return }
-                let silent = await self.silenceDetector.isSilent(recording)
-                guard self.audioGeneration == generation else { return }
-                if silent {
-                    self.discardBriefRecording(recording, generation: generation)
-                } else {
-                    self.startProductionPipeline(
-                        recording: recording,
-                        originatingTarget: target
-                    )
-                }
-                if self.audioGeneration == generation {
-                    self.audioTask = nil
-                }
-            }
+            startProductionPipeline(
+                recording: recording,
+                originatingTarget: target
+            )
         } catch let error as AudioRecordingError {
             handleAudioRecordingError(error)
         } catch {
@@ -446,11 +430,9 @@ final class AppCoordinator {
         }
     }
 
-    /// Handles a recording that carries no meaningful speech: either
-    /// shorter than `SystemAudioRecordingService.minimumDuration` (an
-    /// accidental or near-instant chord tap) or held for longer but silent
-    /// per `silenceDetector` (the chord was held without speaking). Sending
-    /// audio like this to the STT model reliably produces filler
+    /// Handles a recording shorter than `SystemAudioRecordingService.minimumDuration`:
+    /// an accidental or near-instant chord tap with essentially no speech.
+    /// Sending audio this short to the STT model reliably produces filler
     /// hallucinations (e.g. "Thank you" for silence), so it is discarded
     /// before transcription — no paste, no error, no HUD feedback, just a
     /// quiet return to idle, matching the deliberate-cancellation path.

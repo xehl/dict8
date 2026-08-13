@@ -13,7 +13,6 @@ struct Dict8App: App {
         let audioRecorder = SystemAudioRecordingService(
             permissionStatus: { microphonePermission.status }
         )
-        let silenceDetector = SystemSilenceDetector()
         let pasteService = SystemTextPasteService(accessibility: accessibility)
         let openRouter = OpenRouterClient(apiKeyStore: apiKeyStore)
         let speechToText = OpenRouterSpeechToTextService(transport: openRouter)
@@ -27,7 +26,6 @@ struct Dict8App: App {
             microphonePermission: microphonePermission,
             audioRecorder: audioRecorder,
             audioPlayback: SystemAudioPlaybackService(),
-            silenceDetector: silenceDetector,
             speechToText: speechToText,
             textCleanup: textCleanup,
             pasteService: pasteService,
