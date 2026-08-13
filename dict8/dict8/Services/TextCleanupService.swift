@@ -165,7 +165,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
     static let defaultDeadline: Duration = .seconds(10)
     static let temperature = 0.1
     /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
-    /// OpenRouter's Auto Router (Beta track, `openrouter/auto-beta`) at the
+    /// OpenRouter's Auto Router (stable slug, `openrouter/auto`) at the
     /// "low" cost tier instead of a pinned primary model plus one explicit
     /// dict8-side fallback.
     static let autoRouterSettings = AutoRouterSettings(costTier: .low)
@@ -227,7 +227,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         // same-model retry. This is a single same-request retry scoped to
         // this one failure class within the existing stage deadline; it
         // does not add a second explicit model attempt (still one call to
-        // "openrouter/auto-beta") and does not apply to any other cleanup
+        // "openrouter/auto") and does not apply to any other cleanup
         // failure or to STT.
         for attempt in 1...2 {
             try Task.checkCancellation()

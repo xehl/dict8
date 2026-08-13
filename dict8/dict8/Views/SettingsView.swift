@@ -219,7 +219,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Cleanup routing")
                 Text(
-                    "Auto Router (Beta) — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
+                    "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
