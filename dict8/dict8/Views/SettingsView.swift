@@ -17,7 +17,8 @@ struct SettingsView: View {
                 #endif
             }
             .formStyle(.grouped)
-            .frame(width: 352, height: columnHeight, alignment: .top)
+            .scrollDisabled(true)
+            .frame(width: 376, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -30,6 +31,7 @@ struct SettingsView: View {
                 #endif
             }
             .formStyle(.grouped)
+            .scrollDisabled(true)
             .frame(width: 352, height: columnHeight, alignment: .top)
 
             Divider()
@@ -40,10 +42,11 @@ struct SettingsView: View {
                 lastIssueSection
             }
             .formStyle(.grouped)
+            .scrollDisabled(true)
             .frame(width: 352, height: columnHeight, alignment: .top)
             .padding(.trailing, 16)
         }
-        .frame(width: 1088, height: columnHeight)
+        .frame(width: 1112, height: columnHeight)
         .onAppear {
             coordinator.refreshConfiguration()
         }
@@ -166,7 +169,7 @@ struct SettingsView: View {
                         || appState.microphonePermissionStatus == .restricted
                 )
 
-                Button("Open Microphone Settings") {
+                Button("Microphone Settings") {
                     coordinator.openMicrophoneSettings()
                 }
             }
@@ -186,7 +189,7 @@ struct SettingsView: View {
                 }
                 .disabled(appState.accessibilityStatus == .granted)
 
-                Button("Open Accessibility Settings") {
+                Button("Accessibility Settings") {
                     coordinator.openAccessibilitySettings()
                 }
             }
@@ -240,10 +243,12 @@ struct SettingsView: View {
                 value: metrics.cleanupFallbackCount.formatted()
             )
             if let top = metrics.topCleanupFallbackReason {
-                LabeledContent(
-                    "Top fallback reason",
-                    value: "\(top.reason.displayName) (\(top.count.formatted()))"
-                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Top fallback reason")
+                    Text("\(top.reason.displayName) (\(top.count.formatted()))")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
             LabeledContent(
                 "Last issue",
