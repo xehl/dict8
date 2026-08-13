@@ -120,7 +120,14 @@ nonisolated protocol SilenceDetecting: Sendable {
 /// exceed -40 dBFS (roughly 0.01 normalized), so the threshold sits between
 /// the two with margin for quiet speech.
 actor SystemSilenceDetector: SilenceDetecting {
-    static let peakAmplitudeThreshold: Float = 0.02
+    /// Lowered from 0.02 (2026-08-13): the original threshold was tuned
+    /// against a full-volume synthetic test tone, not real microphone
+    /// input. macOS applies automatic gain control / noise suppression to
+    /// built-in mics that keeps normal speech peaks well below what a raw
+    /// tone would produce, so 0.02 flagged real speech as silent. Lowered
+    /// while this gets validated against live recordings; adjust further
+    /// if false positives/negatives persist.
+    static let peakAmplitudeThreshold: Float = 0.005
 
     func isSilent(_ recording: RecordedAudioFile) async -> Bool {
         guard let file = try? AVAudioFile(forReading: recording.url),
