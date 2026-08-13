@@ -336,6 +336,29 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
         XCTAssertEqual(capturedRequests.count, 1)
     }
 
+    func testSingleModelExecuteSendsAutoBetaRouterPluginForBetaSlug() async throws {
+        let transport = StubOpenRouterTransport(outcomes: [.response(status: 200, body: successBody)])
+        let client = makeClient(transport: transport)
+
+        let response = try await client.execute(
+            syntheticRequest(),
+            model: "openrouter/auto-beta",
+            autoRouter: AutoRouterSettings(costTier: .low),
+            deadline: .seconds(1)
+        )
+        let capturedRequests = await transport.requests()
+        let sent = try XCTUnwrap(capturedRequests.first)
+        let body = try jsonObject(sent.httpBody)
+        let plugins = try XCTUnwrap(body["plugins"] as? [[String: Any]])
+
+        // The beta track only reads settings sent under its own plugin id;
+        // sending "auto-router" here would be silently ignored by OpenRouter.
+        XCTAssertEqual(body["model"] as? String, "openrouter/auto-beta")
+        XCTAssertEqual(plugins.first?["id"] as? String, "auto-beta-router")
+        XCTAssertEqual(plugins.first?["cost_tier"] as? String, "low")
+        XCTAssertEqual(response.model, "openrouter/auto-beta")
+    }
+
     func testSingleModelExecuteDoesNotFallBackOnEligibleTransientFailure() async throws {
         let transport = StubOpenRouterTransport(outcomes: [
             .response(status: 503, body: errorBody(errorType: "provider_overloaded")),

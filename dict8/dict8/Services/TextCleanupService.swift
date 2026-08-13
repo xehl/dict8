@@ -165,8 +165,9 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
     static let defaultDeadline: Duration = .seconds(10)
     static let temperature = 0.1
     /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
-    /// OpenRouter's Auto Router at the "low" cost tier instead of a pinned
-    /// primary model plus one explicit dict8-side fallback.
+    /// OpenRouter's Auto Router (Beta track, `openrouter/auto-beta`) at the
+    /// "low" cost tier instead of a pinned primary model plus one explicit
+    /// dict8-side fallback.
     static let autoRouterSettings = AutoRouterSettings(costTier: .low)
 
     private let transport: any OpenRouterTransporting

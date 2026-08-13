@@ -350,8 +350,14 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
             guard body["plugins"] == nil else {
                 throw OpenRouterClientError.invalidRequest
             }
+            // Each Auto Router slug only reads settings sent under its own
+            // plugin id: "openrouter/auto" reads "auto-router", while the
+            // beta track "openrouter/auto-beta" reads "auto-beta-router".
+            // Settings sent under the wrong id are silently ignored by
+            // OpenRouter, so the plugin id must track the model slug.
+            let pluginID = model == "openrouter/auto-beta" ? "auto-beta-router" : "auto-router"
             body["plugins"] = [[
-                "id": "auto-router",
+                "id": pluginID,
                 "cost_tier": autoRouter.costTier.rawValue,
             ]]
         }

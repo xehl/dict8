@@ -207,7 +207,7 @@ struct SettingsView: View {
             LabeledContent("Cleanup", value: models.cleanupModel)
             LabeledContent(
                 "Cleanup routing",
-                value: "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
+                value: "Auto Router (Beta) — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
             )
         }
     }
