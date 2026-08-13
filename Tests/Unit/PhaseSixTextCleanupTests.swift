@@ -100,6 +100,49 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         }
     }
 
+    func testInvalidResponseShapesFailWithDistinctReasons() async {
+        let malformed = makeService(
+            transport: CleanupTransportStub(
+                result: .success(
+                    OpenRouterResponse(
+                        data: Data("not json".utf8),
+                        model: model,
+                        attemptNumber: 1,
+                        latency: .milliseconds(25)
+                    )
+                )
+            )
+        )
+        await assertCleanupError(.malformedResponse) {
+            try await malformed.clean("keep these words exactly here")
+        }
+
+        let noChoices = makeService(
+            transport: CleanupTransportStub(
+                result: .success(
+                    OpenRouterResponse(
+                        data: Data(#"{"choices":[]}"#.utf8),
+                        model: model,
+                        attemptNumber: 1,
+                        latency: .milliseconds(25)
+                    )
+                )
+            )
+        )
+        await assertCleanupError(.missingChoice) {
+            try await noChoices.clean("keep these words exactly here")
+        }
+
+        let contentFilter = makeService(
+            transport: CleanupTransportStub(
+                result: .success(response(text: "Keep these", finishReason: "content_filter"))
+            )
+        )
+        await assertCleanupError(.unexpectedFinishReason("content_filter")) {
+            try await contentFilter.clean("keep these words exactly here")
+        }
+    }
+
     func testTransportFailureRemainsTypedAndContentFree() async {
         let service = makeService(
             transport: CleanupTransportStub(result: .failure(.insufficientCredits))

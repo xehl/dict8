@@ -36,6 +36,17 @@ nonisolated enum TextCleanupError: Error, Equatable, LocalizedError, Sendable {
     case invalidInput
     case requestEncodingFailed
     case invalidResponse
+    /// The response body could not be decoded as the expected chat-completion
+    /// shape at all (malformed/unexpected JSON structure).
+    case malformedResponse
+    /// The response decoded but had no usable choice (empty `choices` array
+    /// or a `nil` message content).
+    case missingChoice
+    /// The response finished for a reason other than "stop" (already
+    /// distinguished from "length") — e.g. a content-filter stop or a
+    /// provider-specific reason. Carries only the raw finish_reason string,
+    /// which is a short enum-like token, not user or model content.
+    case unexpectedFinishReason(String?)
     case incompleteOutput
     case emptyOutput
     case suspiciousOutput(CleanupValidationFailure)
@@ -47,7 +58,7 @@ nonisolated enum TextCleanupError: Error, Equatable, LocalizedError, Sendable {
             "Enter non-empty text to clean."
         case .requestEncodingFailed:
             "dict8 could not prepare the cleanup request."
-        case .invalidResponse:
+        case .invalidResponse, .malformedResponse, .missingChoice, .unexpectedFinishReason:
             "OpenRouter returned an invalid cleanup response."
         case .incompleteOutput:
             "The cleanup response was incomplete."
@@ -222,16 +233,16 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         do {
             decoded = try JSONDecoder().decode(CleanupResponse.self, from: response.data)
         } catch {
-            throw TextCleanupError.invalidResponse
+            throw TextCleanupError.malformedResponse
         }
         guard let choice = decoded.choices.first,
               let content = choice.message.content else {
-            throw TextCleanupError.invalidResponse
+            throw TextCleanupError.missingChoice
         }
         guard choice.finishReason == "stop" else {
             throw choice.finishReason == "length"
                 ? TextCleanupError.incompleteOutput
-                : TextCleanupError.invalidResponse
+                : TextCleanupError.unexpectedFinishReason(choice.finishReason)
         }
         let text = try validator.validate(output: content, against: input)
 

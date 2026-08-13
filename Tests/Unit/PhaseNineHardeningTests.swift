@@ -253,4 +253,23 @@ final class PhaseNineHardeningTests: XCTestCase {
 
         XCTAssertEqual(removed, 0)
     }
+
+    func testInvalidCleanupResponseSubReasonsMapDistinctly() {
+        XCTAssertEqual(
+            CleanupFailureReason(cleanupError: .malformedResponse),
+            .malformedResponse
+        )
+        XCTAssertEqual(
+            CleanupFailureReason(cleanupError: .missingChoice),
+            .missingChoice
+        )
+        XCTAssertEqual(
+            CleanupFailureReason(cleanupError: .unexpectedFinishReason("content_filter")),
+            .unexpectedFinishReason
+        )
+        XCTAssertEqual(
+            CleanupFailureReason(cleanupError: .unexpectedFinishReason(nil)),
+            .unexpectedFinishReason
+        )
+    }
 }

@@ -35,6 +35,9 @@ nonisolated enum CleanupFailureReason: String, Codable, Equatable, Sendable, Cas
     case invalidInput
     case requestEncodingFailed
     case invalidResponse
+    case malformedResponse
+    case missingChoice
+    case unexpectedFinishReason
     case incompleteOutput
     case emptyOutput
     case suspiciousMarkdownFence
@@ -54,6 +57,9 @@ nonisolated enum CleanupFailureReason: String, Codable, Equatable, Sendable, Cas
         case .invalidInput: "Invalid input"
         case .requestEncodingFailed: "Request encoding failed"
         case .invalidResponse: "Invalid response"
+        case .malformedResponse: "Malformed response body"
+        case .missingChoice: "No usable response choice"
+        case .unexpectedFinishReason: "Unexpected finish reason"
         case .incompleteOutput: "Incomplete output"
         case .emptyOutput: "Empty output"
         case .suspiciousMarkdownFence: "Rejected: Markdown fence"
@@ -81,6 +87,9 @@ nonisolated enum CleanupFailureReason: String, Codable, Equatable, Sendable, Cas
         case .invalidInput: self = .invalidInput
         case .requestEncodingFailed: self = .requestEncodingFailed
         case .invalidResponse: self = .invalidResponse
+        case .malformedResponse: self = .malformedResponse
+        case .missingChoice: self = .missingChoice
+        case .unexpectedFinishReason: self = .unexpectedFinishReason
         case .incompleteOutput: self = .incompleteOutput
         case .emptyOutput: self = .emptyOutput
         case let .suspiciousOutput(reason):
