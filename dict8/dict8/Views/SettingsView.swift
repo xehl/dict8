@@ -29,7 +29,7 @@ struct SettingsView: View {
                 lastIssueSection
             }
             .formStyle(.grouped)
-            .frame(width: 320)
+            .frame(width: 400)
 
             Divider()
 
@@ -41,9 +41,15 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .frame(width: 320)
         }
-        .frame(width: 960, height: 820)
+        .frame(width: 1040, height: 820)
         .onAppear {
             coordinator.refreshConfiguration()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            coordinator.refreshMicrophonePermission()
+            coordinator.refreshAccessibilityPermission()
         }
         .onDisappear {
             apiKey = ""
@@ -148,10 +154,6 @@ struct SettingsView: View {
                 Button("Open Microphone Settings") {
                     coordinator.openMicrophoneSettings()
                 }
-
-                Button("Refresh Microphone") {
-                    coordinator.refreshMicrophonePermission()
-                }
             }
 
             LabeledContent(
@@ -171,10 +173,6 @@ struct SettingsView: View {
 
                 Button("Open Accessibility Settings") {
                     coordinator.openAccessibilitySettings()
-                }
-
-                Button("Refresh Accessibility") {
-                    coordinator.refreshAccessibilityPermission()
                 }
             }
 
