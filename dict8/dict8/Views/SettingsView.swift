@@ -242,6 +242,14 @@ struct SettingsView: View {
                 "Raw cleanup fallbacks",
                 value: metrics.cleanupFallbackCount.formatted()
             )
+            LabeledContent(
+                "Startup audio cleanup",
+                value: appState.temporaryAudioMaintenanceStatus.displayName
+            )
+            LabeledContent(
+                "Last issue",
+                value: metrics.lastIssueCategory?.displayName ?? "None"
+            )
             if let top = metrics.topCleanupFallbackReason {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Top fallback reason")
@@ -250,14 +258,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            LabeledContent(
-                "Last issue",
-                value: metrics.lastIssueCategory?.displayName ?? "None"
-            )
-            LabeledContent(
-                "Startup audio cleanup",
-                value: appState.temporaryAudioMaintenanceStatus.displayName
-            )
         }
     }
 
