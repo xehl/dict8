@@ -177,6 +177,14 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         return totalReportedCost / Double(successCount)
     }
 
+    /// Reported cost divided across recorded audio minutes. Nil until some
+    /// audio has been recorded, since cost-per-minute is undefined for a
+    /// zero denominator.
+    var costPerAudioMinute: Double? {
+        guard audioMinutes > 0 else { return nil }
+        return totalReportedCost / audioMinutes
+    }
+
     var averageTranscriptionLatencySeconds: Double? {
         average(totalTranscriptionLatencySeconds, count: transcriptionLatencyCount)
     }

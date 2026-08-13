@@ -290,7 +290,8 @@ struct SettingsView: View {
             CostStatRow(
                 label: "Reported total cost",
                 total: metrics.totalReportedCost,
-                perRequest: metrics.averageCostPerRequest
+                perRequest: metrics.averageCostPerRequest,
+                perAudioMinute: metrics.costPerAudioMinute
             )
         }
     }
@@ -566,6 +567,7 @@ private struct CostStatRow: View {
     let label: String
     let total: Double
     let perRequest: Double?
+    let perAudioMinute: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -574,6 +576,7 @@ private struct CostStatRow: View {
             HStack(spacing: 0) {
                 CostStatCell(caption: "total", value: total)
                 CostStatCell(caption: "per request", value: perRequest)
+                CostStatCell(caption: "per audio min", value: perAudioMinute)
                 Spacer()
             }
         }

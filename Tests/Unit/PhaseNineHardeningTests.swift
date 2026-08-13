@@ -63,6 +63,7 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(metrics.lastIssueCategory, .transcriptionFailure)
         XCTAssertEqual(try XCTUnwrap(metrics.successRate), 0.5, accuracy: 0.000_001)
         XCTAssertEqual(try XCTUnwrap(metrics.averageCostPerRequest), 0.003_02, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(metrics.costPerAudioMinute), 0.001_812, accuracy: 0.000_001)
     }
 
     func testSuccessRateAndAverageCostPerRequestHandleNoData() throws {
@@ -73,6 +74,7 @@ final class PhaseNineHardeningTests: XCTestCase {
 
         XCTAssertNil(store.snapshot.successRate)
         XCTAssertNil(store.snapshot.averageCostPerRequest)
+        XCTAssertNil(store.snapshot.costPerAudioMinute)
 
         _ = try store.recordStarted(audioSeconds: 5)
         _ = try store.recordCompletion(
@@ -90,10 +92,13 @@ final class PhaseNineHardeningTests: XCTestCase {
         )
 
         // A completed request with no successes yet: success rate is a
-        // real 0%, but cost-per-request stays nil since there is no
-        // successful request to divide reported cost across.
+        // real 0%, and cost-per-audio-minute is a real 0 (some audio was
+        // recorded but no cost was reported), while cost-per-request stays
+        // nil since there is no successful request to divide reported cost
+        // across.
         XCTAssertEqual(try XCTUnwrap(store.snapshot.successRate), 0)
         XCTAssertNil(store.snapshot.averageCostPerRequest)
+        XCTAssertEqual(try XCTUnwrap(store.snapshot.costPerAudioMinute), 0)
     }
 
     func testLatencyPercentilesEstimateOverRetainedSampleWindow() throws {
