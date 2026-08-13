@@ -311,14 +311,20 @@ struct SettingsView: View {
             }
             .padding(.vertical, 2)
 
-            HStack(spacing: 0) {
-                CostStatCell(caption: "per request", value: metrics.averageCostPerRequest)
-                StatDivider()
-                CostStatCell(caption: "per audio min", value: metrics.costPerAudioMinute)
-                Spacer()
-            }
-            .padding(.vertical, 2)
+            LabeledContent(
+                "Cost per request",
+                value: formattedCost(metrics.averageCostPerRequest)
+            )
+            LabeledContent(
+                "Cost per audio minute",
+                value: formattedCost(metrics.costPerAudioMinute)
+            )
         }
+    }
+
+    private func formattedCost(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return "$" + value.formatted(.number.precision(.fractionLength(6)))
     }
 
     #if DEBUG
