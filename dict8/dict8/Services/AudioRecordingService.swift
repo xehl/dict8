@@ -159,6 +159,13 @@ actor SystemSilenceDetector: SilenceDetecting {
                 peak = max(peak, abs(samples[index]))
             }
         }
+        // Temporary content-free diagnostic (2026-08-13): the amplitude
+        // threshold has been guessed twice and been wrong both times (too
+        // high, then too low) against Eric's actual microphone. Logging
+        // only the peak float — no audio or transcript content — so the
+        // next threshold choice comes from real numbers instead of another
+        // guess. Remove once the threshold is confirmed correct.
+        print("dict8 silence-detector peak amplitude: \(peak) (threshold: \(Self.peakAmplitudeThreshold))")
         return peak < Self.peakAmplitudeThreshold
     }
 }
