@@ -17,7 +17,7 @@ struct SettingsView: View {
                 #endif
             }
             .formStyle(.grouped)
-            .frame(width: 360)
+            .frame(width: 352)
 
             Divider()
 
@@ -28,21 +28,22 @@ struct SettingsView: View {
                 audioRecordingTestSection
                 cleanupTestSection
                 #endif
-                lastIssueSection
             }
             .formStyle(.grouped)
-            .frame(width: 360)
+            .frame(width: 352)
 
             Divider()
 
             Form {
                 latencySection
                 costSection
+                lastIssueSection
             }
             .formStyle(.grouped)
-            .frame(width: 360)
+            .frame(width: 352)
+            .padding(.trailing, 16)
         }
-        .frame(width: 1080, height: 820)
+        .frame(width: 1088, height: 780)
         .onAppear {
             coordinator.refreshConfiguration()
         }
