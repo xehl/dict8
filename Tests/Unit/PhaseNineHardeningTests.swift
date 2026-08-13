@@ -53,8 +53,76 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(metrics.averageTranscriptionLatencySeconds, 2.5)
         XCTAssertEqual(metrics.averageCleanupLatencySeconds, 1)
         XCTAssertEqual(metrics.averagePipelineLatencySeconds, 3.5)
+        XCTAssertEqual(metrics.p50TranscriptionLatencySeconds, 2)
+        XCTAssertEqual(metrics.p95TranscriptionLatencySeconds, 3)
+        XCTAssertEqual(metrics.p50CleanupLatencySeconds, 1)
+        XCTAssertEqual(metrics.p95CleanupLatencySeconds, 1)
         XCTAssertEqual(metrics.cleanupFallbackCount, 1)
         XCTAssertEqual(metrics.lastIssueCategory, .transcriptionFailure)
+    }
+
+    func testLatencyPercentilesEstimateOverRetainedSampleWindow() throws {
+        let suiteName = "PhaseNinePercentiles.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SystemUsageMetricsStore(defaults: defaults)
+
+        for second in 1...100 {
+            _ = try store.recordStarted(audioSeconds: 1)
+            _ = try store.recordCompletion(
+                DictationMetricEvent(
+                    outcome: .success,
+                    transcriptionLatency: .seconds(second),
+                    cleanupLatency: nil,
+                    totalLatency: .seconds(second),
+                    transcriptionCost: nil,
+                    cleanupCost: nil,
+                    usedRawCleanupFallback: false,
+                    issueCategory: nil,
+                    cleanupFailureReason: nil
+                )
+            )
+        }
+
+        let metrics = store.snapshot
+        XCTAssertEqual(metrics.transcriptionLatencyCount, 100)
+        XCTAssertEqual(metrics.p50TranscriptionLatencySeconds, 50)
+        XCTAssertEqual(metrics.p95TranscriptionLatencySeconds, 95)
+        XCTAssertNil(metrics.p50CleanupLatencySeconds)
+        XCTAssertNil(metrics.p95CleanupLatencySeconds)
+    }
+
+    func testLatencySampleWindowStaysBoundedAndKeepsMostRecentSamples() throws {
+        let suiteName = "PhaseNineSampleCap.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SystemUsageMetricsStore(defaults: defaults)
+
+        let sampleCount = UsageMetricsSnapshot.latencySampleCap + 50
+        for second in 1...sampleCount {
+            _ = try store.recordStarted(audioSeconds: 1)
+            _ = try store.recordCompletion(
+                DictationMetricEvent(
+                    outcome: .success,
+                    transcriptionLatency: .seconds(second),
+                    cleanupLatency: nil,
+                    totalLatency: .seconds(second),
+                    transcriptionCost: nil,
+                    cleanupCost: nil,
+                    usedRawCleanupFallback: false,
+                    issueCategory: nil,
+                    cleanupFailureReason: nil
+                )
+            )
+        }
+
+        let metrics = store.snapshot
+        XCTAssertEqual(metrics.transcriptionLatencySamples.count, UsageMetricsSnapshot.latencySampleCap)
+        // The oldest 50 samples (seconds 1...50) should have been evicted;
+        // the retained window starts at second 51.
+        XCTAssertEqual(metrics.transcriptionLatencySamples.min(), 51)
+        XCTAssertEqual(metrics.transcriptionLatencySamples.max(), Double(sampleCount))
+        XCTAssertTrue(metrics.isValid)
     }
 
     func testInvalidMetricsResetWithoutTouchingOtherDefaults() throws {

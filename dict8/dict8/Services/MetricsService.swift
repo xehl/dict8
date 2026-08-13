@@ -119,6 +119,11 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
 
 nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     static let schemaVersion = 1
+    /// Bound on how many recent per-request latency samples are retained per
+    /// stage for percentile estimation. Content-free (durations only, no
+    /// transcript/audio data) but kept bounded — per AGENTS.md §21, metrics
+    /// must stay aggregate rather than an unbounded content-free log.
+    static let latencySampleCap = 200
 
     var version = Self.schemaVersion
     var requestCount = 0
@@ -136,6 +141,11 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     var cleanupFallbackCount = 0
     var lastIssueCategory: DictationIssueCategory?
     var cleanupFallbackReasonCounts: [String: Int] = [:]
+    /// Most recent transcription/cleanup latency samples (seconds), each
+    /// capped at `latencySampleCap`, used only to estimate p50/p95. Oldest
+    /// samples are dropped once the cap is reached.
+    var transcriptionLatencySamples: [Double] = []
+    var cleanupLatencySamples: [Double] = []
 
     var cancellationCount: Int {
         max(0, requestCount - successCount - failureCount)
@@ -159,6 +169,22 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
 
     var averagePipelineLatencySeconds: Double? {
         average(totalPipelineLatencySeconds, count: pipelineLatencyCount)
+    }
+
+    var p50TranscriptionLatencySeconds: Double? {
+        Self.percentile(transcriptionLatencySamples, 0.5)
+    }
+
+    var p95TranscriptionLatencySeconds: Double? {
+        Self.percentile(transcriptionLatencySamples, 0.95)
+    }
+
+    var p50CleanupLatencySeconds: Double? {
+        Self.percentile(cleanupLatencySamples, 0.5)
+    }
+
+    var p95CleanupLatencySeconds: Double? {
+        Self.percentile(cleanupLatencySamples, 0.95)
     }
 
     /// The most frequent recorded cleanup fallback reason, if any fallbacks
@@ -185,10 +211,12 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         if let seconds = Self.validSeconds(event.transcriptionLatency) {
             totalTranscriptionLatencySeconds += seconds
             transcriptionLatencyCount += 1
+            Self.appendSample(seconds, to: &transcriptionLatencySamples)
         }
         if let seconds = Self.validSeconds(event.cleanupLatency) {
             totalCleanupLatencySeconds += seconds
             cleanupLatencyCount += 1
+            Self.appendSample(seconds, to: &cleanupLatencySamples)
         }
         if let seconds = Self.validSeconds(event.totalLatency) {
             totalPipelineLatencySeconds += seconds
@@ -222,6 +250,10 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             && pipelineLatencyCount >= 0
             && cleanupFallbackCount >= 0
             && cleanupFallbackReasonCounts.values.allSatisfy { $0 >= 0 }
+            && transcriptionLatencySamples.count <= Self.latencySampleCap
+            && cleanupLatencySamples.count <= Self.latencySampleCap
+            && transcriptionLatencySamples.allSatisfy(Self.validNumber)
+            && cleanupLatencySamples.allSatisfy(Self.validNumber)
             && Self.validNumber(totalAudioSeconds)
             && Self.validNumber(totalTranscriptionCost)
             && Self.validNumber(totalCleanupCost)
@@ -233,6 +265,23 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     private func average(_ total: Double, count: Int) -> Double? {
         guard count > 0 else { return nil }
         return total / Double(count)
+    }
+
+    private static func appendSample(_ seconds: Double, to samples: inout [Double]) {
+        samples.append(seconds)
+        if samples.count > latencySampleCap {
+            samples.removeFirst(samples.count - latencySampleCap)
+        }
+    }
+
+    /// Nearest-rank percentile over the retained sample window. Returns nil
+    /// when there are no samples yet.
+    private static func percentile(_ samples: [Double], _ fraction: Double) -> Double? {
+        guard !samples.isEmpty else { return nil }
+        let sorted = samples.sorted()
+        let rank = Int((fraction * Double(sorted.count)).rounded(.up))
+        let index = max(0, min(sorted.count - 1, rank - 1))
+        return sorted[index]
     }
 
     private static func validSeconds(_ duration: Duration?) -> Double? {
@@ -254,10 +303,11 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     // MARK: Codable
 
     // Custom Codable so that older persisted snapshots without
-    // `cleanupFallbackReasonCounts` (added after v0's initial release)
-    // decode successfully instead of being treated as invalid data and
-    // reset. Swift's synthesized `Decodable` does not apply a property's
-    // default value to a missing key; it throws `keyNotFound` instead.
+    // `cleanupFallbackReasonCounts`/latency sample arrays (added after v0's
+    // initial release) decode successfully instead of being treated as
+    // invalid data and reset. Swift's synthesized `Decodable` does not apply
+    // a property's default value to a missing key; it throws `keyNotFound`
+    // instead.
     enum CodingKeys: String, CodingKey {
         case version
         case requestCount
@@ -275,6 +325,8 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         case cleanupFallbackCount
         case lastIssueCategory
         case cleanupFallbackReasonCounts
+        case transcriptionLatencySamples
+        case cleanupLatencySamples
     }
 
     init() {}
@@ -306,6 +358,14 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             [String: Int].self,
             forKey: .cleanupFallbackReasonCounts
         ) ?? [:]
+        transcriptionLatencySamples = try container.decodeIfPresent(
+            [Double].self,
+            forKey: .transcriptionLatencySamples
+        ) ?? []
+        cleanupLatencySamples = try container.decodeIfPresent(
+            [Double].self,
+            forKey: .cleanupLatencySamples
+        ) ?? []
     }
 }
 

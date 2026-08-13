@@ -10,17 +10,19 @@ struct SettingsView: View {
         HStack(alignment: .top, spacing: 0) {
             Form {
                 generalSection
+                permissionsSection
+                openRouterSection
                 #if DEBUG
                 recordingHUDSection
                 #endif
             }
             .formStyle(.grouped)
-            .frame(width: 320)
+            .frame(width: 360)
 
             Divider()
 
             Form {
-                permissionsSection
+                usageOverviewSection
                 modelsSection
                 #if DEBUG
                 audioRecordingTestSection
@@ -29,19 +31,18 @@ struct SettingsView: View {
                 lastIssueSection
             }
             .formStyle(.grouped)
-            .frame(width: 400)
+            .frame(width: 360)
 
             Divider()
 
             Form {
-                usageOverviewSection
                 latencySection
                 costSection
             }
             .formStyle(.grouped)
-            .frame(width: 320)
+            .frame(width: 360)
         }
-        .frame(width: 1040, height: 820)
+        .frame(width: 1080, height: 820)
         .onAppear {
             coordinator.refreshConfiguration()
         }
@@ -106,7 +107,12 @@ struct SettingsView: View {
             Text("After clicking, focus a TextEdit document. A successful test seeds Paste Last for ten minutes.")
                 .foregroundStyle(.secondary)
             #endif
+        }
+    }
 
+    @ViewBuilder
+    private var openRouterSection: some View {
+        Section("OpenRouter") {
             LabeledContent("API key", value: appState.apiKeyStatus.displayName)
 
             SecureField("OpenRouter API key", text: $apiKey)
@@ -255,13 +261,32 @@ struct SettingsView: View {
                 value: latency(metrics.averageTranscriptionLatencySeconds)
             )
             LabeledContent(
+                "Transcription p50",
+                value: latency(metrics.p50TranscriptionLatencySeconds)
+            )
+            LabeledContent(
+                "Transcription p95",
+                value: latency(metrics.p95TranscriptionLatencySeconds)
+            )
+            LabeledContent(
                 "Average cleanup",
                 value: latency(metrics.averageCleanupLatencySeconds)
+            )
+            LabeledContent(
+                "Cleanup p50",
+                value: latency(metrics.p50CleanupLatencySeconds)
+            )
+            LabeledContent(
+                "Cleanup p95",
+                value: latency(metrics.p95CleanupLatencySeconds)
             )
             LabeledContent(
                 "Average end-to-end",
                 value: latency(metrics.averagePipelineLatencySeconds)
             )
+
+            Text("Percentiles are estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
+                .foregroundStyle(.secondary)
         }
     }
 
