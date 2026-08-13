@@ -10,8 +10,6 @@ struct SettingsView: View {
         HStack(alignment: .top, spacing: 0) {
             Form {
                 generalSection
-                permissionsSection
-                openRouterSection
                 #if DEBUG
                 recordingHUDSection
                 #endif
@@ -22,6 +20,7 @@ struct SettingsView: View {
             Divider()
 
             Form {
+                permissionsSection
                 modelsSection
                 #if DEBUG
                 audioRecordingTestSection
@@ -101,6 +100,31 @@ struct SettingsView: View {
             Text("After clicking, focus a TextEdit document. A successful test seeds Paste Last for ten minutes.")
                 .foregroundStyle(.secondary)
             #endif
+
+            LabeledContent("API key", value: appState.apiKeyStatus.displayName)
+
+            SecureField("OpenRouter API key", text: $apiKey)
+                .textContentType(nil)
+
+            HStack {
+                Button("Save or Replace") {
+                    let keyToSave = apiKey
+                    apiKey = ""
+                    coordinator.saveAPIKey(keyToSave)
+                }
+                .disabled(apiKey.isEmpty)
+
+                Button("Remove", role: .destructive) {
+                    apiKey = ""
+                    coordinator.removeAPIKey()
+                }
+                .disabled(!appState.apiKeyStatus.canRemoveStoredKey)
+            }
+
+            if appState.apiKeyStatus == .developmentOverride {
+                Text("OPENROUTER_API_KEY takes precedence for this development launch.")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -156,36 +180,6 @@ struct SettingsView: View {
 
             Text("Accessibility lets dict8 inspect the focused target and synthesize paste without reading field contents.")
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var openRouterSection: some View {
-        Section("OpenRouter") {
-            LabeledContent("API key", value: appState.apiKeyStatus.displayName)
-
-            SecureField("OpenRouter API key", text: $apiKey)
-                .textContentType(nil)
-
-            HStack {
-                Button("Save or Replace") {
-                    let keyToSave = apiKey
-                    apiKey = ""
-                    coordinator.saveAPIKey(keyToSave)
-                }
-                .disabled(apiKey.isEmpty)
-
-                Button("Remove", role: .destructive) {
-                    apiKey = ""
-                    coordinator.removeAPIKey()
-                }
-                .disabled(!appState.apiKeyStatus.canRemoveStoredKey)
-            }
-
-            if appState.apiKeyStatus == .developmentOverride {
-                Text("OPENROUTER_API_KEY takes precedence for this development launch.")
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
