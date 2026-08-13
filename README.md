@@ -6,6 +6,12 @@ dict8 is a native macOS push-to-talk dictation utility. Hold `Control + Option`,
 
 The personal v0 is in routine use on Apple silicon with macOS 26. It supports short and long-form dictation, a three-minute recording limit, target-safe paste, a ten-minute memory-only Paste Last cache, and content-free aggregate usage metrics.
 
+### Recent Updates (2026-08-13)
+- **Cleanup Routing & Auto Router Stabilization**: Reverted cleanup model routing from the experimental Beta track (`openrouter/auto-beta`) back to the stable Auto Router slug (`openrouter/auto`) due to excessive zero-completion fallbacks on Beta.
+- **Explicit Reasoning Control**: Added `"reasoning": {"effort": "none"}` to cleanup chat completion payloads, preventing reasoning models selected by Auto Router from exhausting generation token limits on chain-of-thought tokens.
+- **Settings & Metrics Layout Polish**: Streamlined metrics presentation with stacked labels, compact cost stat rows, and restored aggregate historical metrics.
+- **Post-Demo Roadmap**: Documented plan for sub-500ms hybrid architecture combining local Apple Neural Engine STT (`WhisperKit`) with fast pinned cloud cleanup (`docs/HYBRID_LOCAL_STT_IMPLEMENTATION_PLAN.md`).
+
 dict8 is currently distributed as source under the [MIT License](LICENSE). There is no notarized public binary or automatic updater.
 
 ## Requirements

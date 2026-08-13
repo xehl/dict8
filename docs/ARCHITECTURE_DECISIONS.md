@@ -94,7 +94,7 @@ The Settings “Transcribe and Delete” action is a development-validation surf
 
 **Status:** Validated for Phase 6
 
-Send the fixed PRD system prompt and the raw transcript as a separate user message through a standard non-streaming chat completion. Use temperature `0.1`, no tools, plugins, reasoning controls, or structured response format, and a 30-second deadline shared by the primary and explicit fallback. Bound output with `max_completion_tokens = clamp(ceil(UTF8 bytes / 3) + 32, 64, 2048)`.
+Send the fixed PRD system prompt and the raw transcript as a separate user message through a standard non-streaming chat completion with `"reasoning": {"effort": "none"}`. Use temperature `0.1`, no tools, plugins (except Auto Router settings where configured), or structured response format, and a 10-second deadline. Bound output with `max_completion_tokens = min(1024, max(48, ceil(UTF8 bytes / 3) + 32))`.
 
 Trim and reject empty or incomplete output. Treat Markdown fences, unrequested commentary wrappers, substantial expansion, excessive novel vocabulary, and low source-word retention as suspicious. Suspicious successful output is not eligible for another model attempt; the coordinator uses the unchanged raw transcript and shows a content-free warning. Cancellation produces no fallback output. Raw text exists only for the active operation except when the final successful pipeline result later enters the approved Paste Last cache.
 

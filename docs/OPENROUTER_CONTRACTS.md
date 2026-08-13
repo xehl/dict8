@@ -25,7 +25,7 @@ Official references:
 - Endpoint: `POST https://openrouter.ai/api/v1/chat/completions`
 - Authentication: `Authorization: Bearer <token>`
 - Required v0 request shape: one system message, one user message containing the transcript, explicit `model`, non-streaming response, low temperature where supported, and a bounded output-token limit.
-- Phase 6 uses `temperature: 0.1`, `stream: false`, and the current `max_completion_tokens` field. It deliberately omits tools, plugins, reasoning controls, and structured response format to preserve the simplest portable text contract.
+- Phase 6 uses `temperature: 0.1`, `stream: false`, `"reasoning": {"effort": "none"}`, and `max_completion_tokens`. It deliberately omits tools and structured response formats to preserve the simplest portable text contract.
 - Read cleaned text from the first non-streaming choice message.
 - Treat empty content as failure.
 - Require a normal `stop` finish reason; truncated or otherwise incomplete output uses the raw transcript fallback.
