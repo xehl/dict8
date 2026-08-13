@@ -62,8 +62,10 @@ struct SettingsView: View {
     /// Fixed height shared by all three columns so their forms line up
     /// evenly regardless of which column's content happens to be tallest;
     /// the shortest columns get trailing empty space instead of the window
-    /// resizing to their content.
-    private let columnHeight: CGFloat = 780
+    /// resizing to their content. Lowered by ~80pt (roughly two form rows,
+    /// 2026-08-13 per Eric) to trim unneeded trailing whitespace below the
+    /// shorter columns' content.
+    private let columnHeight: CGFloat = 700
 
     @ViewBuilder
     private var generalSection: some View {
