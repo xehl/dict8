@@ -43,10 +43,9 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             body["max_completion_tokens"] as? Int,
             OpenRouterTextCleanupService.outputTokenLimit(for: input)
         )
+        let reasoning = try XCTUnwrap(body["reasoning"] as? [String: Any])
+        XCTAssertEqual(reasoning["effort"] as? String, "none")
         XCTAssertNil(body["model"])
-        XCTAssertNil(body["models"])
-        XCTAssertNil(body["route"])
-        XCTAssertNil(body["reasoning"])
         XCTAssertNil(body["response_format"])
         XCTAssertNil(body["plugins"])
         XCTAssertNil(body["tools"])

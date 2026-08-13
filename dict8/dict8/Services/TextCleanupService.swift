@@ -207,6 +207,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
                     ],
                     temperature: Self.temperature,
                     maxCompletionTokens: Self.outputTokenLimit(for: input),
+                    reasoning: .init(effort: "none"),
                     stream: false
                 )
             )
@@ -314,15 +315,21 @@ nonisolated private struct CleanupRequest: Encodable {
         let content: String
     }
 
+    struct Reasoning: Encodable {
+        let effort: String
+    }
+
     let messages: [Message]
     let temperature: Double
     let maxCompletionTokens: Int
+    let reasoning: Reasoning
     let stream: Bool
 
     enum CodingKeys: String, CodingKey {
         case messages
         case temperature
         case maxCompletionTokens = "max_completion_tokens"
+        case reasoning
         case stream
     }
 }
