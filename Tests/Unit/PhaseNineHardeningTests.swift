@@ -57,8 +57,43 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(metrics.p95TranscriptionLatencySeconds, 3)
         XCTAssertEqual(metrics.p50CleanupLatencySeconds, 1)
         XCTAssertEqual(metrics.p95CleanupLatencySeconds, 1)
+        XCTAssertEqual(metrics.p50PipelineLatencySeconds, 3)
+        XCTAssertEqual(metrics.p95PipelineLatencySeconds, 4)
         XCTAssertEqual(metrics.cleanupFallbackCount, 1)
         XCTAssertEqual(metrics.lastIssueCategory, .transcriptionFailure)
+        XCTAssertEqual(try XCTUnwrap(metrics.successRate), 0.5, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(metrics.averageCostPerRequest), 0.003_02, accuracy: 0.000_001)
+    }
+
+    func testSuccessRateAndAverageCostPerRequestHandleNoData() throws {
+        let suiteName = "PhaseNineNoDataMetrics.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SystemUsageMetricsStore(defaults: defaults)
+
+        XCTAssertNil(store.snapshot.successRate)
+        XCTAssertNil(store.snapshot.averageCostPerRequest)
+
+        _ = try store.recordStarted(audioSeconds: 5)
+        _ = try store.recordCompletion(
+            DictationMetricEvent(
+                outcome: .failure,
+                transcriptionLatency: nil,
+                cleanupLatency: nil,
+                totalLatency: .seconds(1),
+                transcriptionCost: nil,
+                cleanupCost: nil,
+                usedRawCleanupFallback: false,
+                issueCategory: .transcriptionFailure,
+                cleanupFailureReason: nil
+            )
+        )
+
+        // A completed request with no successes yet: success rate is a
+        // real 0%, but cost-per-request stays nil since there is no
+        // successful request to divide reported cost across.
+        XCTAssertEqual(try XCTUnwrap(store.snapshot.successRate), 0)
+        XCTAssertNil(store.snapshot.averageCostPerRequest)
     }
 
     func testLatencyPercentilesEstimateOverRetainedSampleWindow() throws {

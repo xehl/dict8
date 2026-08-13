@@ -141,11 +141,12 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     var cleanupFallbackCount = 0
     var lastIssueCategory: DictationIssueCategory?
     var cleanupFallbackReasonCounts: [String: Int] = [:]
-    /// Most recent transcription/cleanup latency samples (seconds), each
-    /// capped at `latencySampleCap`, used only to estimate p50/p95. Oldest
-    /// samples are dropped once the cap is reached.
+    /// Most recent transcription/cleanup/end-to-end latency samples
+    /// (seconds), each capped at `latencySampleCap`, used only to estimate
+    /// p50/p95. Oldest samples are dropped once the cap is reached.
     var transcriptionLatencySamples: [Double] = []
     var cleanupLatencySamples: [Double] = []
+    var pipelineLatencySamples: [Double] = []
 
     var cancellationCount: Int {
         max(0, requestCount - successCount - failureCount)
@@ -157,6 +158,23 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
 
     var totalReportedCost: Double {
         totalTranscriptionCost + totalCleanupCost
+    }
+
+    /// Fraction of completed requests (success + failure) that succeeded.
+    /// Nil when no request has completed yet, so callers can distinguish
+    /// "no data" from "0% success."
+    var successRate: Double? {
+        let completed = successCount + failureCount
+        guard completed > 0 else { return nil }
+        return Double(successCount) / Double(completed)
+    }
+
+    /// Reported cost divided across successful requests. Nil when there are
+    /// no successful requests yet, since cost is only meaningful per
+    /// completed dictation.
+    var averageCostPerRequest: Double? {
+        guard successCount > 0 else { return nil }
+        return totalReportedCost / Double(successCount)
     }
 
     var averageTranscriptionLatencySeconds: Double? {
@@ -185,6 +203,14 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
 
     var p95CleanupLatencySeconds: Double? {
         Self.percentile(cleanupLatencySamples, 0.95)
+    }
+
+    var p50PipelineLatencySeconds: Double? {
+        Self.percentile(pipelineLatencySamples, 0.5)
+    }
+
+    var p95PipelineLatencySeconds: Double? {
+        Self.percentile(pipelineLatencySamples, 0.95)
     }
 
     /// The most frequent recorded cleanup fallback reason, if any fallbacks
@@ -221,6 +247,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         if let seconds = Self.validSeconds(event.totalLatency) {
             totalPipelineLatencySeconds += seconds
             pipelineLatencyCount += 1
+            Self.appendSample(seconds, to: &pipelineLatencySamples)
         }
         if let cost = event.transcriptionCost, Self.validNumber(cost) {
             totalTranscriptionCost += cost
@@ -252,8 +279,10 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             && cleanupFallbackReasonCounts.values.allSatisfy { $0 >= 0 }
             && transcriptionLatencySamples.count <= Self.latencySampleCap
             && cleanupLatencySamples.count <= Self.latencySampleCap
+            && pipelineLatencySamples.count <= Self.latencySampleCap
             && transcriptionLatencySamples.allSatisfy(Self.validNumber)
             && cleanupLatencySamples.allSatisfy(Self.validNumber)
+            && pipelineLatencySamples.allSatisfy(Self.validNumber)
             && Self.validNumber(totalAudioSeconds)
             && Self.validNumber(totalTranscriptionCost)
             && Self.validNumber(totalCleanupCost)
@@ -327,6 +356,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         case cleanupFallbackReasonCounts
         case transcriptionLatencySamples
         case cleanupLatencySamples
+        case pipelineLatencySamples
     }
 
     init() {}
@@ -365,6 +395,10 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         cleanupLatencySamples = try container.decodeIfPresent(
             [Double].self,
             forKey: .cleanupLatencySamples
+        ) ?? []
+        pipelineLatencySamples = try container.decodeIfPresent(
+            [Double].self,
+            forKey: .pipelineLatencySamples
         ) ?? []
     }
 }

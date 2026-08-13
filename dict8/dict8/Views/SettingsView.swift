@@ -181,9 +181,6 @@ struct SettingsView: View {
                     coordinator.openAccessibilitySettings()
                 }
             }
-
-            Text("Accessibility lets dict8 inspect the focused target and synthesize paste without reading field contents.")
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -222,6 +219,7 @@ struct SettingsView: View {
             LabeledContent("Dictation requests", value: metrics.requestCount.formatted())
             LabeledContent("Successful", value: metrics.successCount.formatted())
             LabeledContent("Failed", value: metrics.failureCount.formatted())
+            LabeledContent("Success rate", value: successRate(metrics.successRate))
             LabeledContent(
                 "Audio minutes",
                 value: metrics.audioMinutes.formatted(
@@ -257,35 +255,31 @@ struct SettingsView: View {
         Section("Latency") {
             let metrics = appState.usageMetrics
             LabeledContent(
-                "Average transcription",
-                value: latency(metrics.averageTranscriptionLatencySeconds)
+                "Transcription",
+                value: latencySummary(
+                    average: metrics.averageTranscriptionLatencySeconds,
+                    p50: metrics.p50TranscriptionLatencySeconds,
+                    p95: metrics.p95TranscriptionLatencySeconds
+                )
             )
             LabeledContent(
-                "Transcription p50",
-                value: latency(metrics.p50TranscriptionLatencySeconds)
+                "Cleanup",
+                value: latencySummary(
+                    average: metrics.averageCleanupLatencySeconds,
+                    p50: metrics.p50CleanupLatencySeconds,
+                    p95: metrics.p95CleanupLatencySeconds
+                )
             )
             LabeledContent(
-                "Transcription p95",
-                value: latency(metrics.p95TranscriptionLatencySeconds)
-            )
-            LabeledContent(
-                "Average cleanup",
-                value: latency(metrics.averageCleanupLatencySeconds)
-            )
-            LabeledContent(
-                "Cleanup p50",
-                value: latency(metrics.p50CleanupLatencySeconds)
-            )
-            LabeledContent(
-                "Cleanup p95",
-                value: latency(metrics.p95CleanupLatencySeconds)
-            )
-            LabeledContent(
-                "Average end-to-end",
-                value: latency(metrics.averagePipelineLatencySeconds)
+                "End-to-end",
+                value: latencySummary(
+                    average: metrics.averagePipelineLatencySeconds,
+                    p50: metrics.p50PipelineLatencySeconds,
+                    p95: metrics.p95PipelineLatencySeconds
+                )
             )
 
-            Text("Percentiles are estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
+            Text("Values are avg / p50 / p95 estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -304,7 +298,9 @@ struct SettingsView: View {
             )
             LabeledContent(
                 "Reported total cost",
-                value: currency(metrics.totalReportedCost)
+                value: metrics.averageCostPerRequest.map {
+                    "\(currency(metrics.totalReportedCost)) (\(currency($0))/request)"
+                } ?? currency(metrics.totalReportedCost)
             )
 
             Text("Reported cost may be partial when OpenRouter omits usage metadata.")
@@ -524,5 +520,14 @@ struct SettingsView: View {
     private func latency(_ value: Double?) -> String {
         guard let value else { return "Not available" }
         return value.formatted(.number.precision(.fractionLength(3))) + " s"
+    }
+
+    private func latencySummary(average: Double?, p50: Double?, p95: Double?) -> String {
+        "\(latency(average)) avg · \(latency(p50)) p50 · \(latency(p95)) p95"
+    }
+
+    private func successRate(_ value: Double?) -> String {
+        guard let value else { return "Not available" }
+        return value.formatted(.percent.precision(.fractionLength(1)))
     }
 }
