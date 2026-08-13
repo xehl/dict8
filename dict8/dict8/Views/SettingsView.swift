@@ -216,10 +216,14 @@ struct SettingsView: View {
             LabeledContent("Transcription", value: models.transcriptionModel)
             LabeledContent("Transcription fallback", value: models.transcriptionFallbackModel)
             LabeledContent("Cleanup", value: models.cleanupModel)
-            LabeledContent(
-                "Cleanup routing",
-                value: "Auto Router (Beta) — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
-            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Cleanup routing")
+                Text(
+                    "Auto Router (Beta) — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -293,20 +297,27 @@ struct SettingsView: View {
     private var costSection: some View {
         Section("Cost") {
             let metrics = appState.usageMetrics
-            LabeledContent(
-                "Reported transcription cost",
-                value: currency(metrics.totalTranscriptionCost)
-            )
-            LabeledContent(
-                "Reported cleanup cost",
-                value: currency(metrics.totalCleanupCost)
-            )
-            CostStatRow(
-                label: "Reported total cost",
-                total: metrics.totalReportedCost,
-                perRequest: metrics.averageCostPerRequest,
-                perAudioMinute: metrics.costPerAudioMinute
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Inference costs (all time)")
+                    .font(.body)
+                HStack(spacing: 0) {
+                    CostStatCell(caption: "transcription", value: metrics.totalTranscriptionCost)
+                    StatDivider()
+                    CostStatCell(caption: "cleanup", value: metrics.totalCleanupCost)
+                    StatDivider()
+                    CostStatCell(caption: "total", value: metrics.totalReportedCost)
+                    Spacer()
+                }
+            }
+            .padding(.vertical, 2)
+
+            HStack(spacing: 0) {
+                CostStatCell(caption: "per request", value: metrics.averageCostPerRequest)
+                StatDivider()
+                CostStatCell(caption: "per audio min", value: metrics.costPerAudioMinute)
+                Spacer()
+            }
+            .padding(.vertical, 2)
         }
     }
 
@@ -515,15 +526,6 @@ struct SettingsView: View {
         }
     }
 
-    private func currency(_ value: Double) -> String {
-        "$" + value.formatted(.number.precision(.fractionLength(6)))
-    }
-
-    private func latency(_ value: Double?) -> String {
-        guard let value else { return "Not available" }
-        return value.formatted(.number.precision(.fractionLength(3))) + " s"
-    }
-
     private func successRate(_ value: Double?) -> String {
         guard let value else { return "Not available" }
         return value.formatted(.percent.precision(.fractionLength(1)))
@@ -584,31 +586,6 @@ private struct LatencyStatCell: View {
     private var formatted: String {
         guard let value else { return "—" }
         return value.formatted(.number.precision(.fractionLength(3))) + "s"
-    }
-}
-
-/// Compact total/per-request cost row, mirroring `LatencyStatRow`'s layout
-/// so the two-line rows in Latency and Cost read consistently.
-private struct CostStatRow: View {
-    let label: String
-    let total: Double
-    let perRequest: Double?
-    let perAudioMinute: Double?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.body)
-            HStack(spacing: 0) {
-                CostStatCell(caption: "total", value: total)
-                StatDivider()
-                CostStatCell(caption: "per request", value: perRequest)
-                StatDivider()
-                CostStatCell(caption: "per audio min", value: perAudioMinute)
-                Spacer()
-            }
-        }
-        .padding(.vertical, 2)
     }
 }
 
