@@ -64,6 +64,7 @@ final class RecordingHUDController: RecordingHUDPresenting {
     }
 
     private let panel: NSPanel
+    private let hostingView: NSHostingView<TransientHUDView>
     private var presentationTask: Task<Void, Never>?
     private var persistentPresentation: PersistentPresentation?
     private var isShowingTransient = false
@@ -82,9 +83,10 @@ final class RecordingHUDController: RecordingHUDPresenting {
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(
+        hostingView = NSHostingView(
             rootView: TransientHUDView(symbolName: "mic.fill", message: nil)
         )
+        panel.contentView = hostingView
     }
 
     deinit {
@@ -177,10 +179,8 @@ final class RecordingHUDController: RecordingHUDPresenting {
         message: String?,
         width: CGFloat
     ) {
+        hostingView.rootView = TransientHUDView(symbolName: symbolName, message: message)
         panel.setContentSize(NSSize(width: width, height: 48))
-        panel.contentView = NSHostingView(
-            rootView: TransientHUDView(symbolName: symbolName, message: message)
-        )
         positionOnActiveScreen()
         panel.orderFrontRegardless()
     }
