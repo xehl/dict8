@@ -254,32 +254,26 @@ struct SettingsView: View {
     private var latencySection: some View {
         Section("Latency") {
             let metrics = appState.usageMetrics
-            LabeledContent(
-                "Transcription",
-                value: latencySummary(
-                    average: metrics.averageTranscriptionLatencySeconds,
-                    p50: metrics.p50TranscriptionLatencySeconds,
-                    p95: metrics.p95TranscriptionLatencySeconds
-                )
+            LatencyStatRow(
+                label: "Transcription",
+                average: metrics.averageTranscriptionLatencySeconds,
+                p50: metrics.p50TranscriptionLatencySeconds,
+                p95: metrics.p95TranscriptionLatencySeconds
             )
-            LabeledContent(
-                "Cleanup",
-                value: latencySummary(
-                    average: metrics.averageCleanupLatencySeconds,
-                    p50: metrics.p50CleanupLatencySeconds,
-                    p95: metrics.p95CleanupLatencySeconds
-                )
+            LatencyStatRow(
+                label: "Cleanup",
+                average: metrics.averageCleanupLatencySeconds,
+                p50: metrics.p50CleanupLatencySeconds,
+                p95: metrics.p95CleanupLatencySeconds
             )
-            LabeledContent(
-                "End-to-end",
-                value: latencySummary(
-                    average: metrics.averagePipelineLatencySeconds,
-                    p50: metrics.p50PipelineLatencySeconds,
-                    p95: metrics.p95PipelineLatencySeconds
-                )
+            LatencyStatRow(
+                label: "End-to-end",
+                average: metrics.averagePipelineLatencySeconds,
+                p50: metrics.p50PipelineLatencySeconds,
+                p95: metrics.p95PipelineLatencySeconds
             )
 
-            Text("Values are avg / p50 / p95 estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
+            Text("Estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -296,11 +290,10 @@ struct SettingsView: View {
                 "Reported cleanup cost",
                 value: currency(metrics.totalCleanupCost)
             )
-            LabeledContent(
-                "Reported total cost",
-                value: metrics.averageCostPerRequest.map {
-                    "\(currency(metrics.totalReportedCost)) (\(currency($0))/request)"
-                } ?? currency(metrics.totalReportedCost)
+            CostStatRow(
+                label: "Reported total cost",
+                total: metrics.totalReportedCost,
+                perRequest: metrics.averageCostPerRequest
             )
 
             Text("Reported cost may be partial when OpenRouter omits usage metadata.")
@@ -522,12 +515,95 @@ struct SettingsView: View {
         return value.formatted(.number.precision(.fractionLength(3))) + " s"
     }
 
-    private func latencySummary(average: Double?, p50: Double?, p95: Double?) -> String {
-        "\(latency(average)) avg · \(latency(p50)) p50 · \(latency(p95)) p95"
-    }
-
     private func successRate(_ value: Double?) -> String {
         guard let value else { return "Not available" }
         return value.formatted(.percent.precision(.fractionLength(1)))
+    }
+}
+
+/// Compact avg/p50/p95 latency row: the stage label on one line, then the
+/// three stats laid out in a fixed-width mini table so they read as columns
+/// rather than a single wrapped string, avoiding the empty gutter under the
+/// label that a wrapped `LabeledContent` value produces.
+private struct LatencyStatRow: View {
+    let label: String
+    let average: Double?
+    let p50: Double?
+    let p95: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.body)
+            HStack(spacing: 0) {
+                LatencyStatCell(caption: "avg", value: average)
+                LatencyStatCell(caption: "p50", value: p50)
+                LatencyStatCell(caption: "p95", value: p95)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+private struct LatencyStatCell: View {
+    let caption: String
+    let value: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(formatted)
+                .font(.callout.monospacedDigit())
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var formatted: String {
+        guard let value else { return "—" }
+        return value.formatted(.number.precision(.fractionLength(3))) + "s"
+    }
+}
+
+/// Compact total/per-request cost row, mirroring `LatencyStatRow`'s layout
+/// so the two-line rows in Latency and Cost read consistently.
+private struct CostStatRow: View {
+    let label: String
+    let total: Double
+    let perRequest: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.body)
+            HStack(spacing: 0) {
+                CostStatCell(caption: "total", value: total)
+                CostStatCell(caption: "per request", value: perRequest)
+                Spacer()
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+private struct CostStatCell: View {
+    let caption: String
+    let value: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(formatted)
+                .font(.callout.monospacedDigit())
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(minWidth: 100, alignment: .leading)
+    }
+
+    private var formatted: String {
+        guard let value else { return "—" }
+        return "$" + value.formatted(.number.precision(.fractionLength(6)))
     }
 }
