@@ -16,6 +16,9 @@ final class PhaseZeroFoundationTests: XCTestCase {
         // rule: it routes through OpenRouter's Auto Router (stable slug) as
         // a single explicit model attempt (AGENTS.md §4, PRD.md §8).
         XCTAssertEqual(configuration.cleanupModel, "openrouter/auto")
+        XCTAssertEqual(configuration.localTranscriptionModel, "distil-whisper/distil-large-v3")
+        XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("google/gemini-2.5-flash-lite"))
+        XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("openrouter/auto"))
     }
 
     func testFocusedElementSnapshotCarriesNoFieldValue() {

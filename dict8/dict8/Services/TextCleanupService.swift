@@ -185,7 +185,12 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
     ) {
         self.transport = transport
         self.model = model
-        self.autoRouter = autoRouter
+        // Only attach Auto Router settings if the model is an Auto Router slug
+        if model.hasPrefix("openrouter/auto") {
+            self.autoRouter = autoRouter
+        } else {
+            self.autoRouter = nil
+        }
         self.deadline = deadline
         self.validator = validator
     }

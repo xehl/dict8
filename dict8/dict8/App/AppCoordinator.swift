@@ -153,6 +153,14 @@ final class AppCoordinator {
         }
     }
 
+    func setTranscriptionEngine(_ engine: AppState.TranscriptionEngine) {
+        state.setTranscriptionEngine(engine)
+    }
+
+    func setSelectedCleanupModel(_ model: String) {
+        state.setSelectedCleanupModel(model)
+    }
+
     func requestAccessibilityPermission() {
         accessibility.requestPermission()
         refreshAccessibilityPermission()

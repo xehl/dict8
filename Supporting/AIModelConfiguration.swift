@@ -16,6 +16,14 @@ nonisolated struct AIModelConfiguration: Equatable, Sendable {
 
     static let defaultLocalTranscriptionModel = "distil-whisper/distil-large-v3"
 
+    /// Fast cloud candidate models evaluated during benchmarking harness experimentation.
+    static let fastCleanupCandidates: [String] = [
+        "google/gemini-2.5-flash-lite",
+        "meta-llama/llama-3.1-8b-instruct:nitro",
+        "openai/gpt-4o-mini",
+        "openrouter/auto",
+    ]
+
     static let phaseZeroVerified = AIModelConfiguration(
         transcriptionModel: "openai/whisper-large-v3",
         transcriptionFallbackModel: "google/chirp-3",

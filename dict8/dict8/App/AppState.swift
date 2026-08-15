@@ -378,6 +378,20 @@ struct AppConfiguration: Equatable, Sendable {
 @MainActor
 final class AppState: ObservableObject {
     static let enabledDefaultsKey = "dict8.isEnabled"
+    static let transcriptionEngineDefaultsKey = "dict8.transcriptionEngine"
+    static let cleanupModelDefaultsKey = "dict8.cleanupModel"
+
+    public enum TranscriptionEngine: String, CaseIterable, Sendable {
+        case local = "local"
+        case cloud = "cloud"
+
+        public var displayName: String {
+            switch self {
+            case .local: "Local (WhisperKit ANE)"
+            case .cloud: "Cloud (OpenRouter)"
+            }
+        }
+    }
 
     @Published private(set) var status: AppStatus
     @Published private(set) var apiKeyStatus: APIKeyStatus = .checking
@@ -396,6 +410,8 @@ final class AppState: ObservableObject {
     @Published private(set) var usageMetrics = UsageMetricsSnapshot()
     @Published private(set) var metricsStatus: MetricsStoreStatus = .available
     @Published private(set) var temporaryAudioMaintenanceStatus: TemporaryAudioMaintenanceStatus = .pending
+    @Published private(set) var transcriptionEngine: TranscriptionEngine = .local
+    @Published private(set) var selectedCleanupModel: String = AIModelConfiguration.phaseZeroVerified.cleanupModel
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -418,6 +434,32 @@ final class AppState: ObservableObject {
             enabledPreference = defaults.bool(forKey: Self.enabledDefaultsKey)
             status = enabledPreference ? .idle : .disabled
         }
+
+        if let rawEngine = defaults.string(forKey: Self.transcriptionEngineDefaultsKey),
+           let engine = TranscriptionEngine(rawValue: rawEngine) {
+            transcriptionEngine = engine
+        } else {
+            transcriptionEngine = .local
+            defaults.set(TranscriptionEngine.local.rawValue, forKey: Self.transcriptionEngineDefaultsKey)
+        }
+
+        if let savedCleanup = defaults.string(forKey: Self.cleanupModelDefaultsKey),
+           AIModelConfiguration.fastCleanupCandidates.contains(savedCleanup) {
+            selectedCleanupModel = savedCleanup
+        } else {
+            selectedCleanupModel = AIModelConfiguration.phaseZeroVerified.cleanupModel
+            defaults.set(AIModelConfiguration.phaseZeroVerified.cleanupModel, forKey: Self.cleanupModelDefaultsKey)
+        }
+    }
+
+    func setTranscriptionEngine(_ engine: TranscriptionEngine) {
+        transcriptionEngine = engine
+        defaults.set(engine.rawValue, forKey: Self.transcriptionEngineDefaultsKey)
+    }
+
+    func setSelectedCleanupModel(_ model: String) {
+        selectedCleanupModel = model
+        defaults.set(model, forKey: Self.cleanupModelDefaultsKey)
     }
 
     var isEnabled: Bool {

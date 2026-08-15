@@ -21,6 +21,23 @@ final class PhaseOneAppShellTests: XCTestCase {
         XCTAssertEqual(restoredState.status, .disabled)
     }
 
+    func testTranscriptionEngineAndCleanupModelPersistChanges() throws {
+        let suiteName = "PhaseOnePipelineSettingsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let initialState = AppState(defaults: defaults)
+        XCTAssertEqual(initialState.transcriptionEngine, .local)
+        XCTAssertEqual(initialState.selectedCleanupModel, "openrouter/auto")
+
+        initialState.setTranscriptionEngine(.cloud)
+        initialState.setSelectedCleanupModel("google/gemini-2.5-flash-lite")
+
+        let restoredState = AppState(defaults: defaults)
+        XCTAssertEqual(restoredState.transcriptionEngine, .cloud)
+        XCTAssertEqual(restoredState.selectedCleanupModel, "google/gemini-2.5-flash-lite")
+    }
+
     func testCoordinatorUpdatesEnabledStateAndPresentsHUD() {
         let suiteName = "PhaseOneAppShellTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

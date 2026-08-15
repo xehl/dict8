@@ -86,6 +86,29 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertNil(result.usage)
     }
 
+    func testPinnedFastCleanupCandidateDoesNotSendAutoRouterSettings() async throws {
+        let transport = CleanupTransportStub(
+            result: .success(
+                response(
+                    text: "Punctuation added swiftly.",
+                    model: "google/gemini-2.5-flash-lite"
+                )
+            )
+        )
+        let service = OpenRouterTextCleanupService(
+            transport: transport,
+            model: "google/gemini-2.5-flash-lite"
+        )
+
+        let result = try await service.clean("punctuation added swiftly")
+        let executions = await transport.executions()
+        let execution = try XCTUnwrap(executions.first)
+
+        XCTAssertEqual(execution.model, "google/gemini-2.5-flash-lite")
+        XCTAssertNil(execution.autoRouter)
+        XCTAssertEqual(result.text, "Punctuation added swiftly.")
+    }
+
     func testEmptyAndTruncatedResponsesFailClearly() async {
         let empty = makeService(
             transport: CleanupTransportStub(result: .success(response(text: "  ")))

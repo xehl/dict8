@@ -211,18 +211,48 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var modelsSection: some View {
-        Section("Models") {
+        Section("Models & Pipeline") {
             let models = AIModelConfiguration.phaseZeroVerified
-            LabeledContent("Transcription", value: models.transcriptionModel)
-            LabeledContent("Transcription fallback", value: models.transcriptionFallbackModel)
-            LabeledContent("Cleanup", value: models.cleanupModel)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Cleanup routing")
-                Text(
-                    "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            
+            Picker("Transcription Engine", selection: Binding(
+                get: { appState.transcriptionEngine },
+                set: { coordinator.setTranscriptionEngine($0) }
+            )) {
+                ForEach(AppState.TranscriptionEngine.allCases, id: \.self) { engine in
+                    Text(engine.displayName).tag(engine)
+                }
+            }
+            .pickerStyle(.menu)
+
+            if appState.transcriptionEngine == .local {
+                LabeledContent("Local Model", value: models.localTranscriptionModel)
+                LabeledContent("Hardware", value: "Apple Neural Engine (ANE)")
+            } else {
+                LabeledContent("Cloud Primary", value: models.transcriptionModel)
+                LabeledContent("Cloud Fallback", value: models.transcriptionFallbackModel)
+            }
+
+            Picker("Cleanup Candidate", selection: Binding(
+                get: { appState.selectedCleanupModel },
+                set: { coordinator.setSelectedCleanupModel($0) }
+            )) {
+                ForEach(AIModelConfiguration.fastCleanupCandidates, id: \.self) { candidate in
+                    Text(candidate).tag(candidate)
+                }
+            }
+            .pickerStyle(.menu)
+
+            if appState.selectedCleanupModel == "openrouter/auto" {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Cleanup routing")
+                    Text(
+                        "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                }
+            } else {
+                LabeledContent("Routing Mode", value: "Pinned Fast Cloud Candidate")
             }
         }
     }
