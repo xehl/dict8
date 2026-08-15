@@ -1,75 +1,75 @@
-# Hybrid Architecture: On-Device STT (WhisperKit) + Fast Cloud Cleanup
+# Hybrid Architecture: On-Device STT (WhisperKit) + Fast Cloud Cleanup Experimentation
 
-**Status:** Proposed / Post-Demo Roadmap  
+**Status:** Approved Post-Demo Implementation Plan  
 **Target:** Sub-500ms End-to-End Dictation Pipeline  
 **Author:** Eric Lee  
-**Date:** 2026-08-13  
+**Date:** 2026-08-15  
 
 ---
 
-## 1. Motivation & Latency Breakdown
+## 1. Objectives & Latency Target
 
-The current production baseline uses a sequential two-stage remote architecture:
-1. **Remote STT:** Audio upload + OpenAI Whisper Large v3 over OpenRouter ($\sim 400\text{–}600\text{ms}$).
-2. **Remote Cleanup:** Text-in/text-out via OpenRouter Auto Router ($\sim 1,200\text{–}2,500\text{ms}$).
-3. **Total Pipeline Latency:** $\sim 1.7\text{–}3.0\text{s}$.
+Transition `dict8` from full cloud processing to a hybrid model:
+1. **On-Device STT:** Process audio on Apple Silicon ANE using `WhisperKit` (`distil-whisper/distil-large-v3` default).
+2. **Fast Cloud Cleanup:** Benchmark candidate fast models via OpenRouter (evaluating latency, TTFT, formatting quality, and reliability) before committing to a final pinned model.
 
-### Target Hybrid Architecture
-By moving Speech-to-Text directly onto the Apple Silicon Apple Neural Engine (ANE) and pairing it with a pinned, low-latency cloud model for text cleanup, we eliminate audio network upload time, eliminate Whisper server queuing, and reduce the pipeline to a single lightweight text HTTP request.
+### Latency Budget
 
-| Stage | Target Technology | Target Latency | Network Cost / Data Transfer |
+| Stage | Technology / Candidate | Target Latency | Notes |
 | :--- | :--- | :--- | :--- |
-| **Stage 1: Speech-to-Text** | Local `WhisperKit` (`distil-whisper-large-v3` or `base.en`) on ANE | $\mathbf{100\text{–}150\text{ms}}$ | $0 (Audio never leaves Mac) |
-| **Stage 2: Text Cleanup** | Pinned Fast LLM via OpenRouter (`google/gemini-2.5-flash-lite` or `meta-llama/llama-3.1-8b-instruct`) | $\mathbf{200\text{–}300\text{ms}}$ | $<1\text{KB}$ JSON payload |
-| **Total End-to-End** | **Hybrid Pipeline** | $\mathbf{\sim 350\text{–}480\text{ms}}$ | **~75% Latency Reduction** |
+| **Stage 1: STT** | `WhisperKit` (`distil-large-v3`) on ANE | **$100\text{–}150\text{ms}$** | $0 egress; audio stays on-device |
+| **Stage 2: Cleanup** | OpenRouter Fast Candidates (e.g., Gemini 2.5 Flash Lite, Llama 3.1 8B Nitro, GPT-4o-mini) | **$200\text{–}300\text{ms}$** | Evaluated via experimentation harness |
+| **Stage 3: Paste** | Synthetic CGEvent Paste | **$<30\text{ms}$** | Native macOS pasteboard dispatch |
+| **Total End-to-End** | **Hybrid Pipeline** | **$\mathbf{\sim 350\text{–}480\text{ms}}$** | **$\mathbf{\sim 75\text{–}85\%}$ latency reduction** |
 
 ---
 
-## 2. Component Design
+## 2. Agreed Implementation Details
 
-### 2.1 Local Transcription Provider (`WhisperKitSpeechToTextService`)
-- Implement `SpeechToTextProviding` protocol with a local CoreML / ANE engine.
-- Model selection:
-  - `openai/whisper-tiny.en` / `base.en`: Ultra-low latency ($\sim 50\text{–}80\text{ms}$).
-  - `distil-whisper/distil-large-v3`: Production parity with Whisper Large v3 at $\sim 120\text{–}180\text{ms}$.
-- Zero audio file disk serialization needed; raw `AVAudioPCMBuffer` can be handed directly to WhisperKit in memory.
+### 2.1 Local STT Provider (`LocalSpeechToTextService`)
+- **Default Model:** `distil-whisper/distil-large-v3` for high accuracy matching Whisper Large v3 at fraction of latency.
+- **Engine:** `WhisperKit` via Swift Package Manager (`https://github.com/argmaxinc/WhisperKit.git`).
+- **Memory & Lifecycle:**
+  - Model assets cached in `~/Library/Application Support/dict8/models`.
+  - App launch background pre-warming in `AppCoordinator` / `dict8App` to avoid first-run cold start.
+  - Direct memory buffer transcription (`AVAudioPCMBuffer`) avoiding disk I/O where possible.
+  - Automatic fallback to `OpenRouterSpeechToTextService` if CoreML initialization or hardware acceleration fails.
 
-### 2.2 Pinned Fast Remote Cleanup (`FastCloudTextCleanupService`)
-- Direct model pin bypassing Auto Router failover cascades.
-- Candidates:
-  - `google/gemini-2.5-flash-lite` (TTFT $\sim 150\text{–}250\text{ms}$, $\$0.10/\text{M}$ prompt, $\$0.40/\text{M}$ completion).
-  - `meta-llama/llama-3.1-8b-instruct:nitro` (TTFT $\sim 120\text{–}200\text{ms}$).
-- Retain existing validation rules:
-  - `max_completion_tokens` clamped to transcript length.
-  - `reasoning: { effort: "none" }` to prevent thinking tokens.
-  - Retention and anti-hallucination checks from `TextCleanupValidator`.
+### 2.2 Cloud Cleanup Experimentation Harness (`FastCloudTextCleanupService`)
+- **Configurable Model Candidates:**
+  - `google/gemini-2.5-flash-lite`
+  - `meta-llama/llama-3.1-8b-instruct:nitro`
+  - `openai/gpt-4o-mini`
+  - `openrouter/auto` (baseline comparison)
+- **Controls & Guardrails Maintained:**
+  - `reasoning: { effort: "none" }` sent on all completions.
+  - `provider.zdr: true` enforced on all requests.
+  - `max_completion_tokens` clamped to input transcript length with conservative floor.
+  - Zero-completion retry accommodation retained.
+  - Strict retention and anti-hallucination validation via `TextCleanupValidator`.
+
+### 2.3 Settings & Telemetry
+- **Settings UI:**
+  - Transcription Engine: `Local (WhisperKit)` (default) vs. `Cloud (OpenRouter)`.
+  - Cleanup Model Selector / Experiment Toggle to easily switch candidate models during benchmarking.
+- **Metrics:**
+  - Separate logging for `localSTTLatency`, `cloudCleanupLatency`, and candidate model identifier.
+  - Aggregate metrics preserved without logging transcript text or PII.
 
 ---
 
-## 3. Step-by-Step Implementation Plan
+## 3. Phased Implementation Roadmap
 
-### Phase 1: Dependency & Model Management
-1. Add `WhisperKit` via Swift Package Manager (`https://github.com/argmaxinc/WhisperKit.git`).
-2. Implement background model pre-warming on app launch in `AppCoordinator` so initial dictation has no cold-start delay.
-3. Add asset caching under `~/Library/Application Support/dict8/models`.
-
-### Phase 2: Local STT Service Implementation
-1. Create `dict8/dict8/Services/LocalSpeechToTextService.swift` conforming to `SpeechToTextProviding`.
-2. Wrap `WhisperKit.transcribe` with async/await error isolation and non-blocking actor isolation.
-3. Handle fallback gracefully: If CoreML/ANE fails to initialize (e.g. low memory), fall back to `OpenRouterSpeechToTextService`.
-
-### Phase 3: Pinned Fast Cleanup Configuration
-1. Update `Supporting/AIModelConfiguration.swift` with an explicit fast-tier cleanup model option (e.g., `google/gemini-2.5-flash-lite`).
-2. Configure `OpenRouterTextCleanupService` to support direct pinned routing without the Auto Router plugin wrapper when configured for fast mode.
-
-### Phase 4: Settings & Metrics Integration
-1. Add a toggle in Settings: **Transcription Engine** (`Local (WhisperKit)` vs `OpenRouter Cloud`).
-2. Update `UsageMetricsSnapshot` to track:
-   - `localTranscriptionLatency`
-   - On-device vs cloud routing ratio.
-3. Verify all privacy requirements in `PRIVACY_AND_LOGGING.md`: confirm audio buffer is wiped from memory immediately after transcription.
-
-### Phase 5: Verification & Benchmark Suite
-1. Run standard test harness (`PhaseFiveSpeechToTextTests`, `PhaseSixTextCleanupTests`, `PhaseEightPipelineTests`).
-2. Benchmark 50 test utterances across short (<3s), medium (3–10s), and long (>10s) audio clips.
-3. Confirm p50 $< 400\text{ms}$ and p95 $< 700\text{ms}$.
+1. **Phase A — SPM Dependencies & Local STT Service:**
+   - Integrate `WhisperKit` package.
+   - Implement `LocalSpeechToTextService: SpeechToTextProviding`.
+2. **Phase B — Model Lifecycle & Pre-Warming:**
+   - Implement model download, asset verification, and launch pre-warming.
+3. **Phase C — Multi-Model Cleanup Configuration:**
+   - Update `AIModelConfiguration.swift` and `OpenRouterClient.swift` to support clean swapping across fast cleanup candidate models.
+4. **Phase D — Settings & Metrics Integration:**
+   - Add engine toggle & model selector in `SettingsView.swift`.
+   - Update `MetricsService.swift` to record per-model latency distributions.
+5. **Phase E — Benchmarking & Verification:**
+   - Benchmark 50 test utterances across short (<3s), medium (3–10s), and long (>10s) audio clips.
+   - Record and compare p50/p95 latency and quality across candidate models.

@@ -67,6 +67,7 @@ Latency targets are directional because network and model latency vary; they are
 - 180-second automatic recording stop
 - OpenRouter speech-to-text through its dedicated transcription endpoint
 - OpenRouter text cleanup using a pinned model and one configured fallback
+- Hybrid local speech-to-text using WhisperKit on Apple Silicon ANE with automatic remote fallback, plus fast cloud cleanup model experimentation (approved exception)
 - Account-level OpenAI and Google Zero Data Retention enforcement for STT, plus per-request ZDR enforcement for cleanup
 - Plain-text clipboard write and synthesized `Command + V`
 - `Command + Control + V` to re-paste the last successful dictation from a short-lived memory-only cache

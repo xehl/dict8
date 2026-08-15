@@ -73,6 +73,8 @@ nonisolated enum SpeechToTextError: Error, Equatable, LocalizedError, Sendable {
     case requestEncodingFailed
     case invalidResponse
     case emptyTranscript
+    case localModelUnavailable
+    case localTranscriptionFailed(String)
     case transport(OpenRouterClientError)
 
     var errorDescription: String? {
@@ -89,6 +91,10 @@ nonisolated enum SpeechToTextError: Error, Equatable, LocalizedError, Sendable {
             "OpenRouter returned an invalid transcription response."
         case .emptyTranscript:
             "OpenRouter returned an empty transcription."
+        case .localModelUnavailable:
+            "Local speech model is not available or failed to load."
+        case let .localTranscriptionFailed(detail):
+            "Local transcription failed: \(detail)."
         case let .transport(error):
             error.localizedDescription
         }
