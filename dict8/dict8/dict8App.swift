@@ -43,6 +43,9 @@ struct Dict8App: App {
         )
         _appState = StateObject(wrappedValue: state)
         self.coordinator = coordinator
+        Task {
+            await localSpeechToText.prewarm()
+        }
         coordinator.startIfNeeded()
     }
 

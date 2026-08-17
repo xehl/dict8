@@ -4,6 +4,11 @@ import Foundation
 
 protocol LocalWhisperTranscribing: Sendable {
     func transcribeAudioFile(at url: URL) async throws -> String
+    func prewarm() async
+}
+
+extension LocalWhisperTranscribing {
+    func prewarm() async {}
 }
 
 final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
@@ -15,6 +20,10 @@ final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
         self.modelName = modelName
     }
 
+    func prewarm() async {
+        _ = try? await getOrInitializeWhisperKit()
+    }
+
     private func getOrInitializeWhisperKit() async throws -> WhisperKit {
         if let existing = lock.withLock({ whisperKit }) {
             return existing
@@ -24,9 +33,13 @@ final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
         let modelsFolder = appSupport.appendingPathComponent("dict8/models", isDirectory: true)
         try? FileManager.default.createDirectory(at: modelsFolder, withIntermediateDirectories: true)
 
+        let modelFolderURL = try await WhisperKit.download(
+            variant: modelName,
+            downloadBase: modelsFolder
+        )
+
         let pipe = try await WhisperKit(
-            model: modelName,
-            modelFolder: modelsFolder.path,
+            modelFolder: modelFolderURL.path,
             verbose: false,
             logLevel: .error
         )
@@ -61,6 +74,10 @@ actor LocalSpeechToTextService: SpeechToTextProviding {
         self.engine = engine
         self.fallbackService = fallbackService
         self.modelName = modelName
+    }
+
+    func prewarm() async {
+        await engine.prewarm()
     }
 
     func transcribe(_ recording: RecordedAudioFile) async throws -> SpeechTranscription {
