@@ -18,7 +18,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 376, height: columnHeight, alignment: .top)
+            .frame(width: 360, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -32,7 +32,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 352, height: columnHeight, alignment: .top)
+            .frame(width: 340, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -43,10 +43,19 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 352, height: columnHeight, alignment: .top)
+            .frame(width: 330, height: columnHeight, alignment: .top)
+
+            Divider()
+
+            Form {
+                perModelMetricsSection
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .frame(width: 350, height: columnHeight, alignment: .top)
             .padding(.trailing, 16)
         }
-        .frame(width: 1112, height: columnHeight)
+        .frame(width: 1420, height: columnHeight)
         .onAppear {
             coordinator.refreshConfiguration()
         }
@@ -558,6 +567,65 @@ struct SettingsView: View {
             Section(appState.status == .warning ? "Last warning" : "Last error") {
                 Text(lastError.localizedDescription)
                     .foregroundStyle(appState.status == .warning ? .orange : .red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var perModelMetricsSection: some View {
+        Section("Per-Model Transcription") {
+            let transcriptionMetrics = appState.usageMetrics.transcriptionModelMetrics
+            if transcriptionMetrics.isEmpty {
+                Text("No per-model transcription metrics yet.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(transcriptionMetrics.keys.sorted()), id: \.self) { model in
+                    if let stats = transcriptionMetrics[model] {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(model)
+                                .font(.headline)
+                            HStack(spacing: 0) {
+                                LatencyStatCell(caption: "avg", value: stats.averageLatencySeconds)
+                                StatDivider()
+                                LatencyStatCell(caption: "p50", value: stats.p50LatencySeconds)
+                                StatDivider()
+                                LatencyStatCell(caption: "p95", value: stats.p95LatencySeconds)
+                            }
+                            LabeledContent("Total requests", value: stats.count.formatted())
+                            LabeledContent("Total cost", value: formattedCost(stats.totalCost))
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+
+        Section("Per-Model Cleanup") {
+            let cleanupMetrics = appState.usageMetrics.cleanupModelMetrics
+            if cleanupMetrics.isEmpty {
+                Text("No per-model cleanup metrics yet.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(cleanupMetrics.keys.sorted()), id: \.self) { model in
+                    if let stats = cleanupMetrics[model] {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(model)
+                                .font(.headline)
+                            HStack(spacing: 0) {
+                                LatencyStatCell(caption: "avg", value: stats.averageLatencySeconds)
+                                StatDivider()
+                                LatencyStatCell(caption: "p50", value: stats.p50LatencySeconds)
+                                StatDivider()
+                                LatencyStatCell(caption: "p95", value: stats.p95LatencySeconds)
+                            }
+                            LabeledContent("Total requests", value: stats.count.formatted())
+                            LabeledContent("Total cost", value: formattedCost(stats.totalCost))
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
             }
         }
     }

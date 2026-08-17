@@ -5,6 +5,14 @@ protocol LocalWhisperTranscribing: Sendable {
     func transcribeAudioFile(at url: URL) async throws -> String
 }
 
+final class SystemWhisperEngine: LocalWhisperTranscribing {
+    func transcribeAudioFile(at url: URL) async throws -> String {
+        // Transparently throws until full WhisperKit framework binary is linked,
+        // causing LocalSpeechToTextService to gracefully trigger its fallbackService
+        throw SpeechToTextError.localModelUnavailable
+    }
+}
+
 actor LocalSpeechToTextService: SpeechToTextProviding {
     private let engine: any LocalWhisperTranscribing
     private let fallbackService: (any SpeechToTextProviding)?

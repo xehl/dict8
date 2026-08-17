@@ -20,6 +20,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 totalLatency: .seconds(4),
                 transcriptionCost: 0.003,
                 cleanupCost: 0.000_02,
+                transcriptionModel: "openai/whisper-large-v3",
+                cleanupModel: "openrouter/auto",
                 usedRawCleanupFallback: true,
                 issueCategory: .cleanupRawFallback,
                 cleanupFailureReason: .transportDeadlineExceeded
@@ -34,6 +36,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 totalLatency: .seconds(3),
                 transcriptionCost: nil,
                 cleanupCost: nil,
+                transcriptionModel: "distil-whisper/distil-large-v3",
+                cleanupModel: nil,
                 usedRawCleanupFallback: false,
                 issueCategory: .transcriptionFailure,
                 cleanupFailureReason: nil
@@ -64,6 +68,16 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(metrics.successRate), 0.5, accuracy: 0.000_001)
         XCTAssertEqual(try XCTUnwrap(metrics.averageCostPerRequest), 0.003_02, accuracy: 0.000_001)
         XCTAssertEqual(try XCTUnwrap(metrics.costPerAudioMinute), 0.001_812, accuracy: 0.000_001)
+
+        let whisperMetrics = try XCTUnwrap(metrics.transcriptionModelMetrics["openai/whisper-large-v3"])
+        XCTAssertEqual(whisperMetrics.count, 1)
+        XCTAssertEqual(whisperMetrics.averageLatencySeconds, 2.0)
+        XCTAssertEqual(whisperMetrics.totalCost, 0.003)
+
+        let autoMetrics = try XCTUnwrap(metrics.cleanupModelMetrics["openrouter/auto"])
+        XCTAssertEqual(autoMetrics.count, 1)
+        XCTAssertEqual(autoMetrics.averageLatencySeconds, 1.0)
+        XCTAssertEqual(autoMetrics.totalCost, 0.000_02)
     }
 
     func testSuccessRateAndAverageCostPerRequestHandleNoData() throws {

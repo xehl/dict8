@@ -24,7 +24,9 @@ final class AppCoordinator {
     private let audioRecorder: any AudioRecording
     private let audioPlayback: any AudioPlaybackProviding
     private let speechToText: any SpeechToTextProviding
+    private let localSpeechToText: (any SpeechToTextProviding)?
     private let textCleanup: any TextCleanupProviding
+    private let openRouterClient: (any OpenRouterTransporting)?
     private let pasteService: any TextPasting
     private let lastDictationCache: any LastDictationCaching
     private let hotkeyMonitor: any HotkeyMonitoring
@@ -63,7 +65,9 @@ final class AppCoordinator {
         audioRecorder: any AudioRecording,
         audioPlayback: any AudioPlaybackProviding,
         speechToText: any SpeechToTextProviding = UnavailableSpeechToTextService(),
+        localSpeechToText: (any SpeechToTextProviding)? = nil,
         textCleanup: any TextCleanupProviding = UnavailableTextCleanupService(),
+        openRouterClient: (any OpenRouterTransporting)? = nil,
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
         hotkeyMonitor: any HotkeyMonitoring,
@@ -80,7 +84,9 @@ final class AppCoordinator {
         self.audioRecorder = audioRecorder
         self.audioPlayback = audioPlayback
         self.speechToText = speechToText
+        self.localSpeechToText = localSpeechToText
         self.textCleanup = textCleanup
+        self.openRouterClient = openRouterClient
         self.pasteService = pasteService
         self.lastDictationCache = lastDictationCache
         self.hotkeyMonitor = hotkeyMonitor
@@ -161,8 +167,24 @@ final class AppCoordinator {
         state.setSelectedCleanupModel(model)
     }
 
+    private var activeSpeechToText: any SpeechToTextProviding {
+        if state.transcriptionEngine == .local, let localSpeechToText {
+            return localSpeechToText
+        }
+        return speechToText
+    }
+
+    private var activeTextCleanup: any TextCleanupProviding {
+        if let openRouterClient, state.selectedCleanupModel != AIModelConfiguration.phaseZeroVerified.cleanupModel {
+            return OpenRouterTextCleanupService(
+                transport: openRouterClient,
+                model: state.selectedCleanupModel
+            )
+        }
+        return textCleanup
+    }
+
     func requestAccessibilityPermission() {
-        accessibility.requestPermission()
         refreshAccessibilityPermission()
     }
 
@@ -532,10 +554,10 @@ final class AppCoordinator {
         state.clearError()
 
         audioTask?.cancel()
-        audioTask = Task { @MainActor [weak self, speechToText] in
+        audioTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                let transcription = try await speechToText.transcribe(recording)
+                let transcription = try await self.activeSpeechToText.transcribe(recording)
                 try Task.checkCancellation()
                 guard self.audioGeneration == generation else { return }
 
@@ -648,10 +670,10 @@ final class AppCoordinator {
         state.setStatus(.cleaning)
         state.clearError()
 
-        cleanupTask = Task { @MainActor [weak self, textCleanup] in
+        cleanupTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                let result = try await textCleanup.clean(rawText)
+                let result = try await self.activeTextCleanup.clean(rawText)
                 try Task.checkCancellation()
                 guard self.cleanupGeneration == generation else { return }
                 self.state.setCleanupTestOutput(result.text)
@@ -849,6 +871,9 @@ final class AppCoordinator {
         var usedRawCleanupFallback = false
         var cleanupFailureForMetrics: TextCleanupError?
 
+        var transcriptionModelForMetrics: String?
+        var cleanupModelForMetrics: String?
+
         defer {
             hud.finishProcessing()
             if audioNeedsDeletion,
@@ -872,6 +897,8 @@ final class AppCoordinator {
                         totalLatency: timing.total,
                         transcriptionCost: transcriptionCost,
                         cleanupCost: cleanupCost,
+                        transcriptionModel: transcriptionModelForMetrics,
+                        cleanupModel: cleanupModelForMetrics,
                         usedRawCleanupFallback: usedRawCleanupFallback,
                         issueCategory: metricIssue,
                         cleanupFailureReason: cleanupFailureForMetrics.map(CleanupFailureReason.init(cleanupError:))
@@ -903,8 +930,9 @@ final class AppCoordinator {
         let transcriptionStart = clock.now
         let transcription: SpeechTranscription
         do {
-            transcription = try await speechToText.transcribe(recording)
+            transcription = try await activeSpeechToText.transcribe(recording)
             transcriptionDuration = transcriptionStart.duration(to: clock.now)
+            transcriptionModelForMetrics = transcription.model
             try Task.checkCancellation()
         } catch is CancellationError {
             transcriptionDuration = transcriptionStart.duration(to: clock.now)
@@ -971,8 +999,9 @@ final class AppCoordinator {
         var finalText = transcription.text
         var cleanupFailure: TextCleanupError?
         do {
-            let result = try await textCleanup.clean(transcription.text)
+            let result = try await activeTextCleanup.clean(transcription.text)
             cleanupDuration = cleanupStart.duration(to: clock.now)
+            cleanupModelForMetrics = result.model
             try Task.checkCancellation()
             finalText = result.text
             cleanupCost = result.usage?.cost

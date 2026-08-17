@@ -114,6 +114,45 @@ nonisolated enum CleanupFailureReason: String, Codable, Equatable, Sendable, Cas
     }
 }
 
+nonisolated struct ModelMetricsSnapshot: Codable, Equatable, Sendable {
+    var count = 0
+    var totalLatencySeconds = 0.0
+    var totalCost = 0.0
+    var latencySamples: [Double] = []
+
+    var averageLatencySeconds: Double? {
+        guard count > 0 else { return nil }
+        return totalLatencySeconds / Double(count)
+    }
+
+    var p50LatencySeconds: Double? {
+        UsageMetricsSnapshot.percentile(latencySamples, 0.5)
+    }
+
+    var p95LatencySeconds: Double? {
+        UsageMetricsSnapshot.percentile(latencySamples, 0.95)
+    }
+
+    var averageCost: Double? {
+        guard count > 0 else { return nil }
+        return totalCost / Double(count)
+    }
+
+    mutating func record(latencySeconds: Double?, cost: Double?) {
+        count += 1
+        if let latencySeconds, latencySeconds.isFinite, latencySeconds >= 0 {
+            totalLatencySeconds += latencySeconds
+            latencySamples.append(latencySeconds)
+            if latencySamples.count > UsageMetricsSnapshot.latencySampleCap {
+                latencySamples.removeFirst(latencySamples.count - UsageMetricsSnapshot.latencySampleCap)
+            }
+        }
+        if let cost, cost.isFinite, cost >= 0 {
+            totalCost += cost
+        }
+    }
+}
+
 nonisolated struct DictationMetricEvent: Equatable, Sendable {
     let outcome: DictationMetricOutcome
     let transcriptionLatency: Duration?
@@ -121,9 +160,37 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
     let totalLatency: Duration
     let transcriptionCost: Double?
     let cleanupCost: Double?
+    let transcriptionModel: String?
+    let cleanupModel: String?
     let usedRawCleanupFallback: Bool
     let issueCategory: DictationIssueCategory?
     let cleanupFailureReason: CleanupFailureReason?
+
+    init(
+        outcome: DictationMetricOutcome,
+        transcriptionLatency: Duration?,
+        cleanupLatency: Duration?,
+        totalLatency: Duration,
+        transcriptionCost: Double?,
+        cleanupCost: Double?,
+        transcriptionModel: String? = nil,
+        cleanupModel: String? = nil,
+        usedRawCleanupFallback: Bool,
+        issueCategory: DictationIssueCategory?,
+        cleanupFailureReason: CleanupFailureReason?
+    ) {
+        self.outcome = outcome
+        self.transcriptionLatency = transcriptionLatency
+        self.cleanupLatency = cleanupLatency
+        self.totalLatency = totalLatency
+        self.transcriptionCost = transcriptionCost
+        self.cleanupCost = cleanupCost
+        self.transcriptionModel = transcriptionModel
+        self.cleanupModel = cleanupModel
+        self.usedRawCleanupFallback = usedRawCleanupFallback
+        self.issueCategory = issueCategory
+        self.cleanupFailureReason = cleanupFailureReason
+    }
 }
 
 nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
@@ -156,6 +223,8 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     var transcriptionLatencySamples: [Double] = []
     var cleanupLatencySamples: [Double] = []
     var pipelineLatencySamples: [Double] = []
+    var transcriptionModelMetrics: [String: ModelMetricsSnapshot] = [:]
+    var cleanupModelMetrics: [String: ModelMetricsSnapshot] = [:]
 
     var cancellationCount: Int {
         max(0, requestCount - successCount - failureCount)
@@ -272,6 +341,22 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         if let cost = event.cleanupCost, Self.validNumber(cost) {
             totalCleanupCost += cost
         }
+        if let model = event.transcriptionModel, !model.isEmpty {
+            var modelSnapshot = transcriptionModelMetrics[model] ?? ModelMetricsSnapshot()
+            modelSnapshot.record(
+                latencySeconds: Self.validSeconds(event.transcriptionLatency),
+                cost: event.transcriptionCost
+            )
+            transcriptionModelMetrics[model] = modelSnapshot
+        }
+        if let model = event.cleanupModel, !model.isEmpty {
+            var modelSnapshot = cleanupModelMetrics[model] ?? ModelMetricsSnapshot()
+            modelSnapshot.record(
+                latencySeconds: Self.validSeconds(event.cleanupLatency),
+                cost: event.cleanupCost
+            )
+            cleanupModelMetrics[model] = modelSnapshot
+        }
         if event.usedRawCleanupFallback {
             cleanupFallbackCount += 1
         }
@@ -322,7 +407,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
 
     /// Nearest-rank percentile over the retained sample window. Returns nil
     /// when there are no samples yet.
-    private static func percentile(_ samples: [Double], _ fraction: Double) -> Double? {
+    static func percentile(_ samples: [Double], _ fraction: Double) -> Double? {
         guard !samples.isEmpty else { return nil }
         let sorted = samples.sorted()
         let rank = Int((fraction * Double(sorted.count)).rounded(.up))
@@ -374,6 +459,8 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         case transcriptionLatencySamples
         case cleanupLatencySamples
         case pipelineLatencySamples
+        case transcriptionModelMetrics
+        case cleanupModelMetrics
     }
 
     init() {}
@@ -417,6 +504,14 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             [Double].self,
             forKey: .pipelineLatencySamples
         ) ?? []
+        transcriptionModelMetrics = try container.decodeIfPresent(
+            [String: ModelMetricsSnapshot].self,
+            forKey: .transcriptionModelMetrics
+        ) ?? [:]
+        cleanupModelMetrics = try container.decodeIfPresent(
+            [String: ModelMetricsSnapshot].self,
+            forKey: .cleanupModelMetrics
+        ) ?? [:]
     }
 }
 
