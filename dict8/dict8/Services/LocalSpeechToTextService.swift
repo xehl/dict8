@@ -1,15 +1,50 @@
 import AVFoundation
 import Foundation
+@preconcurrency import WhisperKit
 
 protocol LocalWhisperTranscribing: Sendable {
     func transcribeAudioFile(at url: URL) async throws -> String
 }
 
-final class SystemWhisperEngine: LocalWhisperTranscribing {
-    func transcribeAudioFile(at url: URL) async throws -> String {
-        // Transparently throws until full WhisperKit framework binary is linked,
-        // causing LocalSpeechToTextService to gracefully trigger its fallbackService
-        throw SpeechToTextError.localModelUnavailable
+final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
+    private var whisperKit: WhisperKit?
+    private let lock = NSLock()
+    private let modelName: String
+
+    init(modelName: String = "distil-whisper_distil-large-v3") {
+        self.modelName = modelName
+    }
+
+    private func getOrInitializeWhisperKit() async throws -> WhisperKit {
+        if let existing = lock.withLock({ whisperKit }) {
+            return existing
+        }
+
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let modelsFolder = appSupport.appendingPathComponent("dict8/models", isDirectory: true)
+        try? FileManager.default.createDirectory(at: modelsFolder, withIntermediateDirectories: true)
+
+        let pipe = try await WhisperKit(
+            model: modelName,
+            modelFolder: modelsFolder.path,
+            verbose: false,
+            logLevel: .error
+        )
+        lock.withLock {
+            self.whisperKit = pipe
+        }
+        return pipe
+    }
+
+    nonisolated func transcribeAudioFile(at url: URL) async throws -> String {
+        do {
+            let pipe = try await getOrInitializeWhisperKit()
+            let results = try await pipe.transcribe(audioPath: url.path)
+            let fullText = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            return fullText
+        } catch {
+            throw SpeechToTextError.localTranscriptionFailed(error.localizedDescription)
+        }
     }
 }
 

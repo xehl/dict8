@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B00000000000000000000003 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = B00000000000000000000002 /* WhisperKit */; };
 		A00000000000000000000004 /* PhaseZeroFoundationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* PhaseZeroFoundationTests.swift */; };
 		A00000000000000000000005 /* AIModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AIModelConfiguration.swift */; };
 		A00000000000000000000011 /* PhaseOneAppShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* PhaseOneAppShellTests.swift */; };
@@ -68,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B00000000000000000000003 /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +161,7 @@
 			);
 			name = dict8;
 			packageProductDependencies = (
+				B00000000000000000000002 /* WhisperKit */,
 			);
 			productName = dict8;
 			productReference = BEDDA7373001383800254AAC /* dict8.app */;
@@ -192,6 +195,9 @@
 			);
 			mainGroup = BEDDA72E3001383800254AAC;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B00000000000000000000001 /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BEDDA7383001383800254AAC /* Products */;
 			projectDirPath = "";
@@ -256,6 +262,25 @@
 			targetProxy = A0000000000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B00000000000000000000001 /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B00000000000000000000002 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00000000000000000000001 /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A0000000000000000000000E /* Debug */ = {

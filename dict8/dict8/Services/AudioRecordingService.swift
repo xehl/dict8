@@ -135,14 +135,9 @@ final class SystemAudioRecordingService: AudioRecording {
     /// essentially no speech signal, and sending the near-silent audio to
     /// the STT model reliably produces filler hallucinations (e.g. Whisper
     /// returning "Thank you" for silence) that would otherwise get pasted.
-    /// Raised from 0.5s to 1.5s (2026-08-13, Eric's request): dictation
-    /// under a second is rare in practice, and the longer window trades a
-    /// small amount of ergonomics for more margin against hallucinated
-    /// filler on brief, accidental holds. The recording itself is still
-    /// captured and only discarded after this length check, so nothing is
-    /// skipped during the hold — audio just isn't sent to STT if the whole
-    /// recording ends up shorter than this.
-    static let minimumDuration: TimeInterval = 1.5
+    /// Lowered to 0.7s (2026-08-17 per Eric's request) to support quick brief dictation
+    /// phrases while filtering out accidental micro-taps.
+    static let minimumDuration: TimeInterval = 0.7
     static let sampleRate = 16_000.0
     static let channelCount = 1
     static let bitRate = 32_000
