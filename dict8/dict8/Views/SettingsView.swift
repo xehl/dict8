@@ -18,7 +18,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 360, height: columnHeight, alignment: .top)
+            .frame(width: 330, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -32,7 +32,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 340, height: columnHeight, alignment: .top)
+            .frame(width: 375, height: columnHeight, alignment: .top)
 
             Divider()
 
@@ -43,19 +43,17 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 330, height: columnHeight, alignment: .top)
-
-            Divider()
+            .frame(width: 375, height: columnHeight, alignment: .top)
 
             Form {
                 perModelMetricsSection
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(width: 350, height: columnHeight, alignment: .top)
+            .frame(width: 375, height: columnHeight, alignment: .top)
             .padding(.trailing, 16)
         }
-        .frame(width: 1420, height: columnHeight)
+        .frame(width: 1485, height: columnHeight)
         .onAppear {
             coordinator.refreshConfiguration()
         }
