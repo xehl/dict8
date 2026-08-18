@@ -49,7 +49,11 @@ nonisolated enum TextCleanupError: Error, Equatable, LocalizedError, Sendable {
     case unexpectedFinishReason(String?)
     case incompleteOutput
     case emptyOutput
-    case suspiciousOutput(CleanupValidationFailure)
+    case suspiciousOutput(
+        failure: CleanupValidationFailure,
+        candidateOutput: String,
+        metrics: CleanupValidationMetrics
+    )
     case transport(OpenRouterClientError)
 
     var errorDescription: String? {
@@ -64,8 +68,8 @@ nonisolated enum TextCleanupError: Error, Equatable, LocalizedError, Sendable {
             "The cleanup response was incomplete."
         case .emptyOutput:
             "OpenRouter returned empty cleanup text."
-        case let .suspiciousOutput(reason):
-            "dict8 rejected cleanup output: \(reason.displayName.lowercased())."
+        case let .suspiciousOutput(failure, _, _):
+            "dict8 rejected cleanup output: \(failure.displayName.lowercased())."
         case let .transport(error):
             error.localizedDescription
         }
@@ -178,7 +182,11 @@ nonisolated struct CleanupOutputValidator: Sendable {
 
         let evaluation = evaluate(output: output, against: input, customVocabulary: customVocabulary)
         if let failure = evaluation.failure {
-            throw TextCleanupError.suspiciousOutput(failure)
+            throw TextCleanupError.suspiciousOutput(
+                failure: failure,
+                candidateOutput: output,
+                metrics: evaluation.metrics
+            )
         }
 
         return evaluation.cleaned
@@ -345,7 +353,11 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             }
             let evaluation = validator.evaluate(output: content, against: input, customVocabulary: context.customVocabulary)
             if let failure = evaluation.failure {
-                throw TextCleanupError.suspiciousOutput(failure)
+                throw TextCleanupError.suspiciousOutput(
+                    failure: failure,
+                    candidateOutput: content,
+                    metrics: evaluation.metrics
+                )
             }
             let text = evaluation.cleaned
 

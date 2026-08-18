@@ -438,7 +438,11 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             _ = try operation()
             XCTFail("Expected \(expected)")
         } catch let error as TextCleanupError {
-            XCTAssertEqual(error, .suspiciousOutput(expected))
+            guard case let .suspiciousOutput(failure, _, _) = error else {
+                XCTFail("Expected suspiciousOutput, got \(error)")
+                return
+            }
+            XCTAssertEqual(failure, expected)
         } catch {
             XCTFail("Unexpected error type: \(type(of: error))")
         }

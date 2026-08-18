@@ -92,8 +92,8 @@ nonisolated enum CleanupFailureReason: String, Codable, Equatable, Sendable, Cas
         case .unexpectedFinishReason: self = .unexpectedFinishReason
         case .incompleteOutput: self = .incompleteOutput
         case .emptyOutput: self = .emptyOutput
-        case let .suspiciousOutput(reason):
-            switch reason {
+        case let .suspiciousOutput(failure, _, _):
+            switch failure {
             case .markdownFence: self = .suspiciousMarkdownFence
             case .commentaryWrapper: self = .suspiciousCommentaryWrapper
             case .substantialExpansion: self = .suspiciousSubstantialExpansion

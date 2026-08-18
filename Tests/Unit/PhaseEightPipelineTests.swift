@@ -30,17 +30,17 @@ final class PhaseEightPipelineTests: XCTestCase {
 
     func testCleanupFailurePastesRawTranscriptAndWarns() async {
         let harness = PipelineHarness(
-            cleanupResult: .failure(.suspiciousOutput(.substantialExpansion))
+            cleanupResult: .failure(.suspiciousOutput(failure: .substantialExpansion, candidateOutput: "expanded", metrics: .init(inputWordCount: 1, outputWordCount: 5, novelWordCount: 4, novelWordRatio: 0.8, expansionRatio: 2.0)))
         )
 
         await runDictation(harness)
         await waitUntil { harness.state.status == .warning }
 
         XCTAssertEqual(harness.paste.texts, ["raw synthetic transcript"])
-        XCTAssertEqual(
-            harness.state.lastError,
-            .cleanupFailed(.suspiciousOutput(.substantialExpansion))
-        )
+        guard case .cleanupFailed(.suspiciousOutput(.substantialExpansion, _, _)) = harness.state.lastError else {
+            XCTFail("Expected substantial expansion cleanup failure")
+            return
+        }
         XCTAssertTrue(harness.hud.feedback.contains(.cleanupRawFallback))
         XCTAssertEqual(harness.recorder.deleteCount, 1)
         XCTAssertEqual(harness.metrics.snapshot.cleanupFallbackCount, 1)

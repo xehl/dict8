@@ -1055,18 +1055,17 @@ final class AppCoordinator {
             cleanupFailureForMetrics = error
             usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
-            if case let .suspiciousOutput(failure) = error {
-                let eval = CleanupOutputValidator().evaluate(output: finalText, against: transcription.text)
+            if case let .suspiciousOutput(failure, candidateOutput, metrics) = error {
                 cleanupDiagnosticStore.record(
                     model: cleanupModelForMetrics ?? state.selectedCleanupModel,
                     input: transcription.text,
-                    candidateOutput: finalText,
+                    candidateOutput: candidateOutput,
                     failure: failure,
-                    inputWordCount: eval.metrics.inputWordCount,
-                    outputWordCount: eval.metrics.outputWordCount,
-                    novelWordCount: eval.metrics.novelWordCount,
-                    novelWordRatio: eval.metrics.novelWordRatio,
-                    expansionRatio: eval.metrics.expansionRatio
+                    inputWordCount: metrics.inputWordCount,
+                    outputWordCount: metrics.outputWordCount,
+                    novelWordCount: metrics.novelWordCount,
+                    novelWordRatio: metrics.novelWordRatio,
+                    expansionRatio: metrics.expansionRatio
                 )
                 refreshCleanupDiagnostics()
             }
@@ -1325,18 +1324,17 @@ final class AppCoordinator {
         state.setCleanupTestMetadata(nil)
         state.setCleanupTestStatus(.rawFallback)
         state.setWarning(.cleanupFailed(error))
-        if case let .suspiciousOutput(failure) = error {
-            let eval = CleanupOutputValidator().evaluate(output: rawText, against: rawText)
+        if case let .suspiciousOutput(failure, candidateOutput, metrics) = error {
             cleanupDiagnosticStore.record(
                 model: state.selectedCleanupModel,
                 input: rawText,
-                candidateOutput: rawText,
+                candidateOutput: candidateOutput,
                 failure: failure,
-                inputWordCount: eval.metrics.inputWordCount,
-                outputWordCount: eval.metrics.outputWordCount,
-                novelWordCount: eval.metrics.novelWordCount,
-                novelWordRatio: eval.metrics.novelWordRatio,
-                expansionRatio: eval.metrics.expansionRatio
+                inputWordCount: metrics.inputWordCount,
+                outputWordCount: metrics.outputWordCount,
+                novelWordCount: metrics.novelWordCount,
+                novelWordRatio: metrics.novelWordRatio,
+                expansionRatio: metrics.expansionRatio
             )
             refreshCleanupDiagnostics()
         }
