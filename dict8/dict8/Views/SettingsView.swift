@@ -325,6 +325,19 @@ struct SettingsView: View {
                 p95: metrics.p95PipelineLatencySeconds
             )
 
+            if let rtf = metrics.transcriptionRealTimeFactor {
+                LabeledContent(
+                    "Real-time factor (RTF)",
+                    value: rtf.formatted(.number.precision(.fractionLength(3))) + "x"
+                )
+            }
+            if let wps = metrics.transcriptionWordsPerSecond {
+                LabeledContent(
+                    "Transcription throughput",
+                    value: wps.formatted(.number.precision(.fractionLength(1))) + " wps"
+                )
+            }
+
             Text("Estimated over the most recent \(UsageMetricsSnapshot.latencySampleCap) requests per stage.")
                 .foregroundStyle(.secondary)
         }
@@ -589,6 +602,18 @@ struct SettingsView: View {
                                 LatencyStatCell(caption: "p50", value: stats.p50LatencySeconds)
                                 StatDivider()
                                 LatencyStatCell(caption: "p95", value: stats.p95LatencySeconds)
+                            }
+                            if let rtf = stats.realTimeFactor {
+                                LabeledContent(
+                                    "Real-time factor (RTF)",
+                                    value: rtf.formatted(.number.precision(.fractionLength(3))) + "x"
+                                )
+                            }
+                            if let wps = stats.wordsPerSecond {
+                                LabeledContent(
+                                    "Throughput",
+                                    value: wps.formatted(.number.precision(.fractionLength(1))) + " wps"
+                                )
                             }
                             LabeledContent("Total requests", value: stats.count.formatted())
                             LabeledContent("Total cost", value: formattedCost(stats.totalCost))

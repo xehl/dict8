@@ -873,6 +873,7 @@ final class AppCoordinator {
 
         var transcriptionModelForMetrics: String?
         var cleanupModelForMetrics: String?
+        var transcriptWordCountForMetrics: Int?
 
         defer {
             hud.finishProcessing()
@@ -899,6 +900,8 @@ final class AppCoordinator {
                         cleanupCost: cleanupCost,
                         transcriptionModel: transcriptionModelForMetrics,
                         cleanupModel: cleanupModelForMetrics,
+                        audioDurationSeconds: recording.duration,
+                        transcriptWordCount: transcriptWordCountForMetrics,
                         usedRawCleanupFallback: usedRawCleanupFallback,
                         issueCategory: metricIssue,
                         cleanupFailureReason: cleanupFailureForMetrics.map(CleanupFailureReason.init(cleanupError:))
@@ -933,6 +936,10 @@ final class AppCoordinator {
             transcription = try await activeSpeechToText.transcribe(recording)
             transcriptionDuration = transcriptionStart.duration(to: clock.now)
             transcriptionModelForMetrics = transcription.model
+            let words = transcription.text.split(whereSeparator: { character in
+                !character.isLetter && !character.isNumber
+            }).count
+            transcriptWordCountForMetrics = words
             try Task.checkCancellation()
         } catch is CancellationError {
             transcriptionDuration = transcriptionStart.duration(to: clock.now)

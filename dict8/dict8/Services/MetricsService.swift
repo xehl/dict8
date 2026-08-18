@@ -118,11 +118,26 @@ nonisolated struct ModelMetricsSnapshot: Codable, Equatable, Sendable {
     var count = 0
     var totalLatencySeconds = 0.0
     var totalCost = 0.0
+    var totalAudioSeconds = 0.0
+    var totalWordCount = 0
     var latencySamples: [Double] = []
 
     var averageLatencySeconds: Double? {
         guard count > 0 else { return nil }
         return totalLatencySeconds / Double(count)
+    }
+
+    /// Real-time factor: seconds of latency per second of recorded audio.
+    /// Lower is faster (e.g. 0.10 means transcribing 10s of audio took 1s).
+    var realTimeFactor: Double? {
+        guard totalAudioSeconds > 0 else { return nil }
+        return totalLatencySeconds / totalAudioSeconds
+    }
+
+    /// Transcription processing throughput in words per second.
+    var wordsPerSecond: Double? {
+        guard totalLatencySeconds > 0, totalWordCount > 0 else { return nil }
+        return Double(totalWordCount) / totalLatencySeconds
     }
 
     var p50LatencySeconds: Double? {
@@ -138,7 +153,12 @@ nonisolated struct ModelMetricsSnapshot: Codable, Equatable, Sendable {
         return totalCost / Double(count)
     }
 
-    mutating func record(latencySeconds: Double?, cost: Double?) {
+    mutating func record(
+        latencySeconds: Double?,
+        cost: Double?,
+        audioSeconds: Double? = nil,
+        wordCount: Int? = nil
+    ) {
         count += 1
         if let latencySeconds, latencySeconds.isFinite, latencySeconds >= 0 {
             totalLatencySeconds += latencySeconds
@@ -149,6 +169,12 @@ nonisolated struct ModelMetricsSnapshot: Codable, Equatable, Sendable {
         }
         if let cost, cost.isFinite, cost >= 0 {
             totalCost += cost
+        }
+        if let audioSeconds, audioSeconds.isFinite, audioSeconds > 0 {
+            totalAudioSeconds += audioSeconds
+        }
+        if let wordCount, wordCount > 0 {
+            totalWordCount += wordCount
         }
     }
 }
@@ -162,6 +188,8 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
     let cleanupCost: Double?
     let transcriptionModel: String?
     let cleanupModel: String?
+    let audioDurationSeconds: Double?
+    let transcriptWordCount: Int?
     let usedRawCleanupFallback: Bool
     let issueCategory: DictationIssueCategory?
     let cleanupFailureReason: CleanupFailureReason?
@@ -175,6 +203,8 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
         cleanupCost: Double?,
         transcriptionModel: String? = nil,
         cleanupModel: String? = nil,
+        audioDurationSeconds: Double? = nil,
+        transcriptWordCount: Int? = nil,
         usedRawCleanupFallback: Bool,
         issueCategory: DictationIssueCategory?,
         cleanupFailureReason: CleanupFailureReason?
@@ -187,6 +217,8 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
         self.cleanupCost = cleanupCost
         self.transcriptionModel = transcriptionModel
         self.cleanupModel = cleanupModel
+        self.audioDurationSeconds = audioDurationSeconds
+        self.transcriptWordCount = transcriptWordCount
         self.usedRawCleanupFallback = usedRawCleanupFallback
         self.issueCategory = issueCategory
         self.cleanupFailureReason = cleanupFailureReason
@@ -206,6 +238,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     var successCount = 0
     var failureCount = 0
     var totalAudioSeconds = 0.0
+    var totalWordCount = 0
     var totalTranscriptionCost = 0.0
     var totalCleanupCost = 0.0
     var totalTranscriptionLatencySeconds = 0.0
@@ -261,6 +294,20 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
     var costPerAudioMinute: Double? {
         guard audioMinutes > 0 else { return nil }
         return totalReportedCost / audioMinutes
+    }
+
+    /// Real-time factor (RTF) across all transcription requests:
+    /// total transcription latency divided by total recorded audio seconds.
+    /// Values < 1.0 mean transcription ran faster than real-time (e.g. 0.15x = 10s audio transcribed in 1.5s).
+    var transcriptionRealTimeFactor: Double? {
+        guard totalAudioSeconds > 0, totalTranscriptionLatencySeconds > 0 else { return nil }
+        return totalTranscriptionLatencySeconds / totalAudioSeconds
+    }
+
+    /// Transcription processing throughput in words per second.
+    var transcriptionWordsPerSecond: Double? {
+        guard totalTranscriptionLatencySeconds > 0, totalWordCount > 0 else { return nil }
+        return Double(totalWordCount) / totalTranscriptionLatencySeconds
     }
 
     var averageTranscriptionLatencySeconds: Double? {
@@ -341,11 +388,16 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         if let cost = event.cleanupCost, Self.validNumber(cost) {
             totalCleanupCost += cost
         }
+        if let words = event.transcriptWordCount, words > 0 {
+            totalWordCount += words
+        }
         if let model = event.transcriptionModel, !model.isEmpty {
             var modelSnapshot = transcriptionModelMetrics[model] ?? ModelMetricsSnapshot()
             modelSnapshot.record(
                 latencySeconds: Self.validSeconds(event.transcriptionLatency),
-                cost: event.transcriptionCost
+                cost: event.transcriptionCost,
+                audioSeconds: event.audioDurationSeconds,
+                wordCount: event.transcriptWordCount
             )
             transcriptionModelMetrics[model] = modelSnapshot
         }
@@ -385,6 +437,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             && transcriptionLatencySamples.allSatisfy(Self.validNumber)
             && cleanupLatencySamples.allSatisfy(Self.validNumber)
             && pipelineLatencySamples.allSatisfy(Self.validNumber)
+            && totalWordCount >= 0
             && Self.validNumber(totalAudioSeconds)
             && Self.validNumber(totalTranscriptionCost)
             && Self.validNumber(totalCleanupCost)
@@ -445,6 +498,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         case successCount
         case failureCount
         case totalAudioSeconds
+        case totalWordCount
         case totalTranscriptionCost
         case totalCleanupCost
         case totalTranscriptionLatencySeconds
@@ -472,6 +526,7 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
         successCount = try container.decode(Int.self, forKey: .successCount)
         failureCount = try container.decode(Int.self, forKey: .failureCount)
         totalAudioSeconds = try container.decode(Double.self, forKey: .totalAudioSeconds)
+        totalWordCount = try container.decodeIfPresent(Int.self, forKey: .totalWordCount) ?? 0
         totalTranscriptionCost = try container.decode(Double.self, forKey: .totalTranscriptionCost)
         totalCleanupCost = try container.decode(Double.self, forKey: .totalCleanupCost)
         totalTranscriptionLatencySeconds = try container.decode(

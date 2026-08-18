@@ -22,6 +22,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 cleanupCost: 0.000_02,
                 transcriptionModel: "openai/whisper-large-v3",
                 cleanupModel: "openrouter/auto",
+                audioDurationSeconds: 60,
+                transcriptWordCount: 150,
                 usedRawCleanupFallback: true,
                 issueCategory: .cleanupRawFallback,
                 cleanupFailureReason: .transportDeadlineExceeded
@@ -38,6 +40,8 @@ final class PhaseNineHardeningTests: XCTestCase {
                 cleanupCost: nil,
                 transcriptionModel: "distil-whisper/distil-large-v3",
                 cleanupModel: nil,
+                audioDurationSeconds: 30,
+                transcriptWordCount: 75,
                 usedRawCleanupFallback: false,
                 issueCategory: .transcriptionFailure,
                 cleanupFailureReason: nil
@@ -68,11 +72,15 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(metrics.successRate), 0.5, accuracy: 0.000_001)
         XCTAssertEqual(try XCTUnwrap(metrics.averageCostPerRequest), 0.003_02, accuracy: 0.000_001)
         XCTAssertEqual(try XCTUnwrap(metrics.costPerAudioMinute), 0.001_812, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(metrics.transcriptionRealTimeFactor), 5.0 / 100.0, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(metrics.transcriptionWordsPerSecond), 225.0 / 5.0, accuracy: 0.000_001)
 
         let whisperMetrics = try XCTUnwrap(metrics.transcriptionModelMetrics["openai/whisper-large-v3"])
         XCTAssertEqual(whisperMetrics.count, 1)
         XCTAssertEqual(whisperMetrics.averageLatencySeconds, 2.0)
         XCTAssertEqual(whisperMetrics.totalCost, 0.003)
+        XCTAssertEqual(try XCTUnwrap(whisperMetrics.realTimeFactor), 2.0 / 60.0, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(whisperMetrics.wordsPerSecond), 150.0 / 2.0, accuracy: 0.000_001)
 
         let autoMetrics = try XCTUnwrap(metrics.cleanupModelMetrics["openrouter/auto"])
         XCTAssertEqual(autoMetrics.count, 1)
