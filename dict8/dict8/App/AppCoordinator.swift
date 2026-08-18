@@ -182,6 +182,10 @@ final class AppCoordinator {
         state.setSelectedCleanupModel(model)
     }
 
+    func setCustomVocabulary(_ vocabulary: String) {
+        state.setCustomVocabulary(vocabulary)
+    }
+
     private var activeSpeechToText: any SpeechToTextProviding {
         if state.transcriptionEngine == .local, let localSpeechToText {
             return localSpeechToText
@@ -688,7 +692,12 @@ final class AppCoordinator {
         cleanupTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                let result = try await self.activeTextCleanup.clean(rawText)
+                let context = CleanupContext(
+                    targetAppName: nil,
+                    targetBundleID: nil,
+                    customVocabulary: self.state.customVocabulary
+                )
+                let result = try await self.activeTextCleanup.clean(rawText, context: context)
                 try Task.checkCancellation()
                 guard self.cleanupGeneration == generation else { return }
                 self.state.setCleanupTestOutput(result.text)
@@ -1021,7 +1030,12 @@ final class AppCoordinator {
         var finalText = transcription.text
         var cleanupFailure: TextCleanupError?
         do {
-            let result = try await activeTextCleanup.clean(transcription.text)
+            let context = CleanupContext(
+                targetAppName: originatingTarget.localizedName,
+                targetBundleID: originatingTarget.bundleIdentifier,
+                customVocabulary: state.customVocabulary
+            )
+            let result = try await activeTextCleanup.clean(transcription.text, context: context)
             cleanupDuration = cleanupStart.duration(to: clock.now)
             cleanupModelForMetrics = result.model
             try Task.checkCancellation()

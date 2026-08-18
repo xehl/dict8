@@ -72,8 +72,33 @@ nonisolated enum TextCleanupError: Error, Equatable, LocalizedError, Sendable {
     }
 }
 
+nonisolated struct CleanupContext: Equatable, Sendable {
+    let targetAppName: String?
+    let targetBundleID: String?
+    let customVocabulary: String
+
+    init(
+        targetAppName: String? = nil,
+        targetBundleID: String? = nil,
+        customVocabulary: String = ""
+    ) {
+        self.targetAppName = targetAppName
+        self.targetBundleID = targetBundleID
+        self.customVocabulary = customVocabulary
+    }
+
+    static let empty = CleanupContext()
+}
+
 nonisolated protocol TextCleanupProviding: Sendable {
     func clean(_ transcript: String) async throws -> TextCleanupResult
+    func clean(_ transcript: String, context: CleanupContext) async throws -> TextCleanupResult
+}
+
+extension TextCleanupProviding {
+    func clean(_ transcript: String) async throws -> TextCleanupResult {
+        try await clean(transcript, context: .empty)
+    }
 }
 
 nonisolated struct CleanupValidationMetrics: Equatable, Sendable {
@@ -85,11 +110,14 @@ nonisolated struct CleanupValidationMetrics: Equatable, Sendable {
 }
 
 nonisolated struct CleanupOutputValidator: Sendable {
-    func evaluate(output: String, against input: String) -> (cleaned: String, failure: CleanupValidationFailure?, metrics: CleanupValidationMetrics) {
+    func evaluate(output: String, against input: String, customVocabulary: String = "") -> (cleaned: String, failure: CleanupValidationFailure?, metrics: CleanupValidationMetrics) {
         let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
         let inputWords = Self.words(in: input)
         let outputWords = Self.words(in: cleaned)
-        let inputSet = Set(inputWords)
+        let vocabWords = Self.words(in: customVocabulary)
+        var inputSet = Set(inputWords)
+        inputSet.formUnion(vocabWords)
+
         let novelWords = outputWords.filter {
             !inputSet.contains($0) && !Self.fillerWords.contains($0)
         }
@@ -133,7 +161,8 @@ nonisolated struct CleanupOutputValidator: Sendable {
         let retentionWords = Self.words(in: Self.retentionSource(input))
         let meaningfulInput = Set(retentionWords.filter { !Self.fillerWords.contains($0) })
         if meaningfulInput.count >= 8 {
-            let meaningfulOutput = Set(outputWords.filter { !Self.fillerWords.contains($0) })
+            var meaningfulOutput = Set(outputWords.filter { !Self.fillerWords.contains($0) })
+            meaningfulOutput.formUnion(vocabWords)
             let retained = meaningfulInput.intersection(meaningfulOutput).count
             if Double(retained) / Double(meaningfulInput.count) < 0.55 {
                 return (cleaned, .insufficientSourceRetention, metrics)
@@ -143,11 +172,11 @@ nonisolated struct CleanupOutputValidator: Sendable {
         return (cleaned, nil, metrics)
     }
 
-    func validate(output: String, against input: String) throws -> String {
+    func validate(output: String, against input: String, customVocabulary: String = "") throws -> String {
         let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { throw TextCleanupError.emptyOutput }
 
-        let evaluation = evaluate(output: output, against: input)
+        let evaluation = evaluate(output: output, against: input, customVocabulary: customVocabulary)
         if let failure = evaluation.failure {
             throw TextCleanupError.suspiciousOutput(failure)
         }
@@ -228,19 +257,21 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         self.validator = validator
     }
 
-    func clean(_ transcript: String) async throws -> TextCleanupResult {
+    func clean(_ transcript: String, context: CleanupContext) async throws -> TextCleanupResult {
         try Task.checkCancellation()
         guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TextCleanupError.invalidInput
         }
         let input = transcript
 
+        let systemPrompt = Self.buildSystemPrompt(context: context)
+
         let body: Data
         do {
             body = try JSONEncoder().encode(
                 CleanupRequest(
                     messages: [
-                        .init(role: "system", content: Self.systemPrompt),
+                        .init(role: "system", content: systemPrompt),
                         .init(role: "user", content: input),
                     ],
                     temperature: Self.temperature,
@@ -312,7 +343,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw TextCleanupError.emptyOutput
             }
-            let evaluation = validator.evaluate(output: content, against: input)
+            let evaluation = validator.evaluate(output: content, against: input, customVocabulary: context.customVocabulary)
             if let failure = evaluation.failure {
                 throw TextCleanupError.suspiciousOutput(failure)
             }
@@ -335,6 +366,26 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         min(1_024, max(128, Int(Double(transcript.utf8.count) * 1.5) + 64))
     }
 
+    nonisolated static func buildSystemPrompt(context: CleanupContext) -> String {
+        var prompt = systemPrompt
+
+        let vocab = context.customVocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !vocab.isEmpty {
+            prompt += "\n\nCustom vocabulary and proper noun spellings to respect:\n\(vocab)"
+        }
+
+        if let appName = context.targetAppName, !appName.isEmpty {
+            let lower = appName.lowercased()
+            if lower.contains("cursor") || lower.contains("xcode") || lower.contains("code") || lower.contains("terminal") || lower.contains("iterm") {
+                prompt += "\n\nTarget application: \(appName) (code editor/terminal). Preserve code formatting, camelCase, snake_case, variable names, terminal flags, and technical identifiers."
+            } else {
+                prompt += "\n\nTarget application: \(appName)."
+            }
+        }
+
+        return prompt
+    }
+
     nonisolated static let systemPrompt = """
     You clean up voice dictation.
 
@@ -349,7 +400,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
 }
 
 nonisolated struct UnavailableTextCleanupService: TextCleanupProviding {
-    func clean(_ transcript: String) async throws -> TextCleanupResult {
+    func clean(_ transcript: String, context: CleanupContext) async throws -> TextCleanupResult {
         throw TextCleanupError.transport(.invalidRequest)
     }
 }

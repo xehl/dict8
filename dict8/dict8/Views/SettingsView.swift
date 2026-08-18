@@ -261,6 +261,22 @@ struct SettingsView: View {
             } else {
                 LabeledContent("Routing Mode", value: "Pinned Fast Cloud Candidate")
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Custom Vocabulary")
+                TextField(
+                    "e.g. OpenRouter, Infisical, Jon Tuite, Abdalla",
+                    text: Binding(
+                        get: { appState.customVocabulary },
+                        set: { coordinator.setCustomVocabulary($0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                Text("Comma-separated proper nouns and technical terms.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
         }
     }
 

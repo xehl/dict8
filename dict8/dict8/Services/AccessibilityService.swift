@@ -24,8 +24,21 @@ enum SecureFieldStatus: Equatable, Sendable {
 
 struct PasteTarget: Equatable, Sendable {
     let bundleIdentifier: String?
+    let localizedName: String?
     let processIdentifier: pid_t?
     let secureFieldStatus: SecureFieldStatus
+
+    init(
+        bundleIdentifier: String?,
+        localizedName: String? = nil,
+        processIdentifier: pid_t?,
+        secureFieldStatus: SecureFieldStatus
+    ) {
+        self.bundleIdentifier = bundleIdentifier
+        self.localizedName = localizedName
+        self.processIdentifier = processIdentifier
+        self.secureFieldStatus = secureFieldStatus
+    }
 
     func identifiesSameApplication(as other: PasteTarget) -> Bool {
         guard let bundleIdentifier,
@@ -106,6 +119,7 @@ final class SystemAccessibilityService: AccessibilityInspecting {
     ) -> PasteTarget {
         PasteTarget(
             bundleIdentifier: application.bundleIdentifier,
+            localizedName: application.localizedName,
             processIdentifier: application.processIdentifier,
             secureFieldStatus: secureFieldStatus
         )

@@ -364,6 +364,29 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertTrue(store.entries().isEmpty)
     }
 
+    func testCustomVocabularyAndTargetAppContextFormatting() async throws {
+        let context = CleanupContext(
+            targetAppName: "Cursor",
+            targetBundleID: "com.todesktop.230313mzl4w4u92",
+            customVocabulary: "OpenRouter, Infisical, Jon Tuite, Abdalla"
+        )
+        let prompt = OpenRouterTextCleanupService.buildSystemPrompt(context: context)
+        XCTAssertTrue(prompt.contains("Custom vocabulary and proper noun spellings to respect:"))
+        XCTAssertTrue(prompt.contains("OpenRouter, Infisical, Jon Tuite, Abdalla"))
+        XCTAssertTrue(prompt.contains("Target application: Cursor"))
+        XCTAssertTrue(prompt.contains("code editor/terminal"))
+
+        // Verify that custom vocabulary words are recognized
+        let validator = CleanupOutputValidator()
+        let evaluation = validator.evaluate(
+            output: "I used Infisical with OpenRouter yesterday on macOS.",
+            against: "I used in physical with open router yesterday on macOS",
+            customVocabulary: "OpenRouter, Infisical"
+        )
+        XCTAssertNil(evaluation.failure)
+        XCTAssertEqual(evaluation.metrics.novelWordCount, 0)
+    }
+
     private let model = "openrouter/auto"
 
     private func makeService(transport: CleanupTransportStub) -> OpenRouterTextCleanupService {
@@ -489,7 +512,7 @@ private actor CleanupTransportStub: OpenRouterTransporting {
 
 private struct StubCleanupService: TextCleanupProviding {
     let result: Result<TextCleanupResult, TextCleanupError>
-    func clean(_ transcript: String) throws -> TextCleanupResult { try result.get() }
+    func clean(_ transcript: String, context: CleanupContext) throws -> TextCleanupResult { try result.get() }
 }
 
 private actor CleanupAPIKeyStore: APIKeyStoring {

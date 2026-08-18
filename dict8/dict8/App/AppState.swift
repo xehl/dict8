@@ -380,6 +380,7 @@ final class AppState: ObservableObject {
     static let enabledDefaultsKey = "dict8.isEnabled"
     static let transcriptionEngineDefaultsKey = "dict8.transcriptionEngine"
     static let cleanupModelDefaultsKey = "dict8.cleanupModel"
+    static let customVocabularyDefaultsKey = "dict8.customVocabulary"
 
     public enum TranscriptionEngine: String, CaseIterable, Sendable {
         case local = "local"
@@ -412,6 +413,7 @@ final class AppState: ObservableObject {
     @Published private(set) var temporaryAudioMaintenanceStatus: TemporaryAudioMaintenanceStatus = .pending
     @Published private(set) var transcriptionEngine: TranscriptionEngine = .local
     @Published private(set) var selectedCleanupModel: String = AIModelConfiguration.phaseZeroVerified.cleanupModel
+    @Published private(set) var customVocabulary: String = ""
     @Published private(set) var cleanupDiagnostics: [CleanupDiagnosticEntry] = []
     @Published private(set) var lastError: AppShellError?
 
@@ -451,6 +453,17 @@ final class AppState: ObservableObject {
             selectedCleanupModel = AIModelConfiguration.phaseZeroVerified.cleanupModel
             defaults.set(AIModelConfiguration.phaseZeroVerified.cleanupModel, forKey: Self.cleanupModelDefaultsKey)
         }
+
+        if let savedVocab = defaults.string(forKey: Self.customVocabularyDefaultsKey) {
+            customVocabulary = savedVocab
+        } else {
+            customVocabulary = ""
+        }
+    }
+
+    func setCustomVocabulary(_ vocabulary: String) {
+        customVocabulary = vocabulary
+        defaults.set(vocabulary, forKey: Self.customVocabularyDefaultsKey)
     }
 
     func setTranscriptionEngine(_ engine: TranscriptionEngine) {

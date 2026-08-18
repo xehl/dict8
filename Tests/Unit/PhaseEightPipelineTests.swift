@@ -397,7 +397,7 @@ private actor PipelineCleanup: TextCleanupProviding {
         self.result = result
     }
 
-    func clean(_ transcript: String) async throws -> TextCleanupResult {
+    func clean(_ transcript: String, context: CleanupContext) async throws -> TextCleanupResult {
         calls += 1
         return try result.get()
     }
