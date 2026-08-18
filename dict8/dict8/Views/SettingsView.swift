@@ -377,6 +377,11 @@ struct SettingsView: View {
         return "$" + value.formatted(.number.precision(.fractionLength(6)))
     }
 
+    private func formatStatSeconds(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return value.formatted(.number.precision(.fractionLength(3))) + "s"
+    }
+
     #if DEBUG
     @ViewBuilder
     private var audioRecordingTestSection: some View {
@@ -593,32 +598,34 @@ struct SettingsView: View {
             } else {
                 ForEach(Array(transcriptionMetrics.keys.sorted()), id: \.self) { model in
                     if let stats = transcriptionMetrics[model] {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(model)
-                                .font(.headline)
-                            HStack(spacing: 0) {
-                                LatencyStatCell(caption: "avg", value: stats.averageLatencySeconds)
-                                StatDivider()
-                                LatencyStatCell(caption: "p50", value: stats.p50LatencySeconds)
-                                StatDivider()
-                                LatencyStatCell(caption: "p95", value: stats.p95LatencySeconds)
+                                .font(.subheadline.bold())
+                            HStack(spacing: 8) {
+                                Text("\(formatStatSeconds(stats.averageLatencySeconds)) avg")
+                                Text("·")
+                                Text("\(formatStatSeconds(stats.p50LatencySeconds)) p50")
+                                Text("·")
+                                Text("\(formatStatSeconds(stats.p95LatencySeconds)) p95")
                             }
-                            if let rtf = stats.realTimeFactor {
-                                LabeledContent(
-                                    "Real-time factor (RTF)",
-                                    value: rtf.formatted(.number.precision(.fractionLength(3))) + "x"
-                                )
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+
+                            HStack {
+                                if let rtf = stats.realTimeFactor {
+                                    Text("\(rtf.formatted(.number.precision(.fractionLength(2))))x RTF")
+                                }
+                                if let wps = stats.wordsPerSecond {
+                                    Text("·")
+                                    Text("\(wps.formatted(.number.precision(.fractionLength(0)))) wps")
+                                }
+                                Spacer()
+                                Text("\(stats.count) req · \(formattedCost(stats.totalCost))")
                             }
-                            if let wps = stats.wordsPerSecond {
-                                LabeledContent(
-                                    "Throughput",
-                                    value: wps.formatted(.number.precision(.fractionLength(1))) + " wps"
-                                )
-                            }
-                            LabeledContent("Total requests", value: stats.count.formatted())
-                            LabeledContent("Total cost", value: formattedCost(stats.totalCost))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 2)
                     }
                 }
             }
@@ -633,20 +640,26 @@ struct SettingsView: View {
             } else {
                 ForEach(Array(cleanupMetrics.keys.sorted()), id: \.self) { model in
                     if let stats = cleanupMetrics[model] {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(model)
-                                .font(.headline)
-                            HStack(spacing: 0) {
-                                LatencyStatCell(caption: "avg", value: stats.averageLatencySeconds)
-                                StatDivider()
-                                LatencyStatCell(caption: "p50", value: stats.p50LatencySeconds)
-                                StatDivider()
-                                LatencyStatCell(caption: "p95", value: stats.p95LatencySeconds)
+                                .font(.subheadline.bold())
+                            HStack(spacing: 8) {
+                                Text("\(formatStatSeconds(stats.averageLatencySeconds)) avg")
+                                Text("·")
+                                Text("\(formatStatSeconds(stats.p50LatencySeconds)) p50")
+                                Text("·")
+                                Text("\(formatStatSeconds(stats.p95LatencySeconds)) p95")
                             }
-                            LabeledContent("Total requests", value: stats.count.formatted())
-                            LabeledContent("Total cost", value: formattedCost(stats.totalCost))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+
+                            HStack {
+                                Text("\(stats.count) req · \(formattedCost(stats.totalCost))")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 2)
                     }
                 }
             }
