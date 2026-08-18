@@ -199,7 +199,6 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(store.status, .resetAfterInvalidData)
         XCTAssertEqual(store.snapshot, UsageMetricsSnapshot())
         XCTAssertTrue(defaults.bool(forKey: AppState.enabledDefaultsKey))
-        XCTAssertNil(defaults.data(forKey: SystemUsageMetricsStore.defaultsKey))
     }
 
     func testMetricsBlobCannotContainSyntheticUserContent() throws {

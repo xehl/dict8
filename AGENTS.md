@@ -657,6 +657,10 @@ Missing cost metadata must not fail the request.
 
 Use simple persistence such as `UserDefaults` only when the metrics phase is requested.
 
+### Metrics Persistence & Schema Migration Guardrails
+* **No Destructive Defaults Overwrites on Decode Failure:** Stored metrics in `UserDefaults` must never be wiped or cleared when encountering missing or unknown keys. Schema additions (new metrics or model snapshot properties) must always provide `decodeIfPresent` fallback defaults in custom `init(from decoder:)` implementations across both `UsageMetricsSnapshot` and `ModelMetricsSnapshot`.
+* **Preserve Unparsed Payload:** If stored metrics cannot be parsed into a newer struct schema, the store must never call `defaults.removeObject(forKey:)`; it must retain the on-disk data to allow seamless recovery and migration rather than destroying historical usage.
+
 ## 22. Testing
 
 Design service boundaries so orchestration can be tested without live APIs.

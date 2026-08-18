@@ -177,6 +177,27 @@ nonisolated struct ModelMetricsSnapshot: Codable, Equatable, Sendable {
             totalWordCount += wordCount
         }
     }
+
+    enum CodingKeys: String, CodingKey {
+        case count
+        case totalLatencySeconds
+        case totalCost
+        case totalAudioSeconds
+        case totalWordCount
+        case latencySamples
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        count = try container.decodeIfPresent(Int.self, forKey: .count) ?? 0
+        totalLatencySeconds = try container.decodeIfPresent(Double.self, forKey: .totalLatencySeconds) ?? 0.0
+        totalCost = try container.decodeIfPresent(Double.self, forKey: .totalCost) ?? 0.0
+        totalAudioSeconds = try container.decodeIfPresent(Double.self, forKey: .totalAudioSeconds) ?? 0.0
+        totalWordCount = try container.decodeIfPresent(Int.self, forKey: .totalWordCount) ?? 0
+        latencySamples = try container.decodeIfPresent([Double].self, forKey: .latencySamples) ?? []
+    }
 }
 
 nonisolated struct DictationMetricEvent: Equatable, Sendable {
@@ -618,7 +639,9 @@ final class SystemUsageMetricsStore: UsageMetricsRecording {
             snapshot = decoded
             status = .available
         } else {
-            defaults.removeObject(forKey: Self.defaultsKey)
+            // Keep existing invalid data in defaults to prevent accidental loss
+            // during schema migrations, while falling back to an empty snapshot
+            // in memory for the current session.
             snapshot = UsageMetricsSnapshot()
             status = .resetAfterInvalidData
         }
