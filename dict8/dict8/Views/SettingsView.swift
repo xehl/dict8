@@ -651,6 +651,54 @@ struct SettingsView: View {
                 }
             }
         }
+
+        Section("Recent Validation Diagnostics") {
+            let diagnostics = appState.cleanupDiagnostics
+            if diagnostics.isEmpty {
+                Text("No recent validation rejections.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("\(diagnostics.count) recent event(s)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear") {
+                        coordinator.clearCleanupDiagnostics()
+                    }
+                    .font(.caption)
+                }
+                ForEach(diagnostics) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.model)
+                                .font(.caption.bold())
+                            Spacer()
+                            Text(entry.failure.displayName)
+                                .font(.caption2.bold())
+                                .foregroundStyle(.orange)
+                        }
+                        Text("In: \"\(entry.input)\"")
+                            .font(.caption2)
+                            .lineLimit(2)
+                            .foregroundStyle(.secondary)
+                        Text("Out: \"\(entry.candidateOutput)\"")
+                            .font(.caption2)
+                            .lineLimit(2)
+                            .foregroundStyle(.primary)
+                        HStack(spacing: 8) {
+                            Text("Novel: \(entry.novelWordCount)w (\(Int(entry.novelWordRatio * 100))%)")
+                                .font(.caption2)
+                            Text("Exp: \(entry.expansionRatio.formatted(.number.precision(.fractionLength(2))))x")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
     }
 
     private func successRate(_ value: Double?) -> String {

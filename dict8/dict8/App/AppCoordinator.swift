@@ -29,6 +29,7 @@ final class AppCoordinator {
     private let openRouterClient: (any OpenRouterTransporting)?
     private let pasteService: any TextPasting
     private let lastDictationCache: any LastDictationCaching
+    private let cleanupDiagnosticStore: any CleanupDiagnosticLogging
     private let hotkeyMonitor: any HotkeyMonitoring
     private let hud: any RecordingHUDPresenting
     private let pipelineTimingHandler: @MainActor (DictationPipelineTiming) -> Void
@@ -70,6 +71,7 @@ final class AppCoordinator {
         openRouterClient: (any OpenRouterTransporting)? = nil,
         pasteService: any TextPasting,
         lastDictationCache: any LastDictationCaching,
+        cleanupDiagnosticStore: any CleanupDiagnosticLogging = NoOpCleanupDiagnosticStore(),
         hotkeyMonitor: any HotkeyMonitoring,
         hud: any RecordingHUDPresenting,
         pipelineTimingHandler: @escaping @MainActor (DictationPipelineTiming) -> Void = { _ in },
@@ -89,6 +91,7 @@ final class AppCoordinator {
         self.openRouterClient = openRouterClient
         self.pasteService = pasteService
         self.lastDictationCache = lastDictationCache
+        self.cleanupDiagnosticStore = cleanupDiagnosticStore
         self.hotkeyMonitor = hotkeyMonitor
         self.hud = hud
         self.pipelineTimingHandler = pipelineTimingHandler
@@ -138,6 +141,16 @@ final class AppCoordinator {
         refreshMicrophonePermission()
         refreshAPIKeyStatus()
         refreshUsageMetrics()
+        refreshCleanupDiagnostics()
+    }
+
+    func refreshCleanupDiagnostics() {
+        state.setCleanupDiagnostics(cleanupDiagnosticStore.entries())
+    }
+
+    func clearCleanupDiagnostics() {
+        cleanupDiagnosticStore.clear()
+        state.clearCleanupDiagnostics()
     }
 
     func setEnabled(_ isEnabled: Bool) {
@@ -156,6 +169,8 @@ final class AppCoordinator {
             hotkeyMonitor.stop()
             state.setHotkeyMonitorStatus(.stopped)
             lastDictationCache.clear()
+            cleanupDiagnosticStore.clear()
+            state.clearCleanupDiagnostics()
         }
     }
 
@@ -872,7 +887,7 @@ final class AppCoordinator {
         var cleanupFailureForMetrics: TextCleanupError?
 
         var transcriptionModelForMetrics: String?
-        var cleanupModelForMetrics: String?
+        var cleanupModelForMetrics: String? = state.selectedCleanupModel
         var transcriptWordCountForMetrics: Int?
 
         defer {
@@ -1026,6 +1041,21 @@ final class AppCoordinator {
             cleanupFailureForMetrics = error
             usedRawCleanupFallback = true
             hud.showFeedback(.cleanupRawFallback)
+            if case let .suspiciousOutput(failure) = error {
+                let eval = CleanupOutputValidator().evaluate(output: finalText, against: transcription.text)
+                cleanupDiagnosticStore.record(
+                    model: cleanupModelForMetrics ?? state.selectedCleanupModel,
+                    input: transcription.text,
+                    candidateOutput: finalText,
+                    failure: failure,
+                    inputWordCount: eval.metrics.inputWordCount,
+                    outputWordCount: eval.metrics.outputWordCount,
+                    novelWordCount: eval.metrics.novelWordCount,
+                    novelWordRatio: eval.metrics.novelWordRatio,
+                    expansionRatio: eval.metrics.expansionRatio
+                )
+                refreshCleanupDiagnostics()
+            }
         } catch {
             cleanupDuration = cleanupStart.duration(to: clock.now)
             guard !Task.isCancelled else {
@@ -1281,6 +1311,21 @@ final class AppCoordinator {
         state.setCleanupTestMetadata(nil)
         state.setCleanupTestStatus(.rawFallback)
         state.setWarning(.cleanupFailed(error))
+        if case let .suspiciousOutput(failure) = error {
+            let eval = CleanupOutputValidator().evaluate(output: rawText, against: rawText)
+            cleanupDiagnosticStore.record(
+                model: state.selectedCleanupModel,
+                input: rawText,
+                candidateOutput: rawText,
+                failure: failure,
+                inputWordCount: eval.metrics.inputWordCount,
+                outputWordCount: eval.metrics.outputWordCount,
+                novelWordCount: eval.metrics.novelWordCount,
+                novelWordRatio: eval.metrics.novelWordRatio,
+                expansionRatio: eval.metrics.expansionRatio
+            )
+            refreshCleanupDiagnostics()
+        }
         scheduleCleanupTestExpiration()
     }
 

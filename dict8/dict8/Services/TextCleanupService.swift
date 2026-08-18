@@ -76,13 +76,36 @@ nonisolated protocol TextCleanupProviding: Sendable {
     func clean(_ transcript: String) async throws -> TextCleanupResult
 }
 
+nonisolated struct CleanupValidationMetrics: Equatable, Sendable {
+    let inputWordCount: Int
+    let outputWordCount: Int
+    let novelWordCount: Int
+    let novelWordRatio: Double
+    let expansionRatio: Double
+}
+
 nonisolated struct CleanupOutputValidator: Sendable {
-    func validate(output: String, against input: String) throws -> String {
+    func evaluate(output: String, against input: String) -> (cleaned: String, failure: CleanupValidationFailure?, metrics: CleanupValidationMetrics) {
         let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { throw TextCleanupError.emptyOutput }
+        let inputWords = Self.words(in: input)
+        let outputWords = Self.words(in: cleaned)
+        let inputSet = Set(inputWords)
+        let novelWords = outputWords.filter {
+            !inputSet.contains($0) && !Self.fillerWords.contains($0)
+        }
+        let novelRatio = Double(novelWords.count) / Double(max(1, outputWords.count))
+        let expansionRatio = Double(cleaned.count) / Double(max(1, input.count))
+
+        let metrics = CleanupValidationMetrics(
+            inputWordCount: inputWords.count,
+            outputWordCount: outputWords.count,
+            novelWordCount: novelWords.count,
+            novelWordRatio: novelRatio,
+            expansionRatio: expansionRatio
+        )
 
         if cleaned.contains("```") || cleaned.contains("~~~") {
-            throw TextCleanupError.suspiciousOutput(.markdownFence)
+            return (cleaned, .markdownFence, metrics)
         }
 
         let lowerOutput = cleaned.lowercased()
@@ -90,23 +113,21 @@ nonisolated struct CleanupOutputValidator: Sendable {
         if Self.commentaryPrefixes.contains(where: {
             lowerOutput.hasPrefix($0) && !lowerInput.hasPrefix($0)
         }) {
-            throw TextCleanupError.suspiciousOutput(.commentaryWrapper)
+            return (cleaned, .commentaryWrapper, metrics)
         }
 
         if cleaned.count > input.count + 120,
-           Double(cleaned.count) > Double(max(1, input.count)) * 1.35 {
-            throw TextCleanupError.suspiciousOutput(.substantialExpansion)
+           expansionRatio > 1.35 {
+            return (cleaned, .substantialExpansion, metrics)
         }
 
-        let inputWords = Self.words(in: input)
-        let outputWords = Self.words(in: cleaned)
-        let inputSet = Set(inputWords)
-        let novelWords = outputWords.filter {
-            !inputSet.contains($0) && !Self.fillerWords.contains($0)
-        }
+        // Novel content validation: require at least 8 novel words AND a novel word ratio > 35%.
+        // For short inputs (fewer than 15 words), relax ratio threshold to 50% to prevent false positives
+        // on routine contraction, spelling, or number formatting expansions.
+        let novelWordRatioCutoff = inputWords.count < 15 ? 0.50 : 0.35
         if novelWords.count >= 8,
-           Double(novelWords.count) / Double(max(1, outputWords.count)) > 0.35 {
-            throw TextCleanupError.suspiciousOutput(.excessiveNovelContent)
+           novelRatio > novelWordRatioCutoff {
+            return (cleaned, .excessiveNovelContent, metrics)
         }
 
         let retentionWords = Self.words(in: Self.retentionSource(input))
@@ -115,11 +136,23 @@ nonisolated struct CleanupOutputValidator: Sendable {
             let meaningfulOutput = Set(outputWords.filter { !Self.fillerWords.contains($0) })
             let retained = meaningfulInput.intersection(meaningfulOutput).count
             if Double(retained) / Double(meaningfulInput.count) < 0.55 {
-                throw TextCleanupError.suspiciousOutput(.insufficientSourceRetention)
+                return (cleaned, .insufficientSourceRetention, metrics)
             }
         }
 
-        return cleaned
+        return (cleaned, nil, metrics)
+    }
+
+    func validate(output: String, against input: String) throws -> String {
+        let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { throw TextCleanupError.emptyOutput }
+
+        let evaluation = evaluate(output: output, against: input)
+        if let failure = evaluation.failure {
+            throw TextCleanupError.suspiciousOutput(failure)
+        }
+
+        return evaluation.cleaned
     }
 
     private static func words(in text: String) -> [String] {
@@ -276,7 +309,14 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
                     ? TextCleanupError.incompleteOutput
                     : TextCleanupError.unexpectedFinishReason(choice.finishReason)
             }
-            let text = try validator.validate(output: content, against: input)
+            guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw TextCleanupError.emptyOutput
+            }
+            let evaluation = validator.evaluate(output: content, against: input)
+            if let failure = evaluation.failure {
+                throw TextCleanupError.suspiciousOutput(failure)
+            }
+            let text = evaluation.cleaned
 
             return TextCleanupResult(
                 text: text,

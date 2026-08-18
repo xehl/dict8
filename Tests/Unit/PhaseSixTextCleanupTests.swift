@@ -56,10 +56,10 @@ final class PhaseSixTextCleanupTests: XCTestCase {
     }
 
     func testOutputTokenLimitIsTranscriptSizedAndClamped() {
-        XCTAssertEqual(OpenRouterTextCleanupService.outputTokenLimit(for: "short"), 48)
+        XCTAssertEqual(OpenRouterTextCleanupService.outputTokenLimit(for: "short"), 128)
         XCTAssertEqual(
             OpenRouterTextCleanupService.outputTokenLimit(for: String(repeating: "a", count: 300)),
-            132
+            514
         )
         XCTAssertEqual(
             OpenRouterTextCleanupService.outputTokenLimit(for: String(repeating: "a", count: 10_000)),
@@ -263,6 +263,16 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         }
     }
 
+    func testValidatorAllowsShortDictationLightExpansions() throws {
+        let validator = CleanupOutputValidator()
+        // Contractions and simple light adjustments on short input
+        let cleaned = try validator.validate(
+            output: "I do not think we can make it today.",
+            against: "dont think we can make it today"
+        )
+        XCTAssertEqual(cleaned, "I do not think we can make it today.")
+    }
+
     func testValidatorRejectsNovelContentAndLowRetention() {
         let validator = CleanupOutputValidator()
         assertValidationError(.excessiveNovelContent) {
@@ -302,6 +312,56 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         coordinator.closeSettingsValidation()
         XCTAssertTrue(state.cleanupTestInput.isEmpty)
         XCTAssertNil(state.cleanupTestOutput)
+    }
+
+    func testCleanupDiagnosticStoreRecordsAndEvicts() {
+        let store = CleanupDiagnosticStore(capacity: 2, lifetime: 60)
+        store.record(
+            model: "google/gemini-2.5-flash-lite",
+            input: "test input",
+            candidateOutput: "test candidate",
+            failure: .excessiveNovelContent,
+            inputWordCount: 2,
+            outputWordCount: 2,
+            novelWordCount: 1,
+            novelWordRatio: 0.5,
+            expansionRatio: 1.0
+        )
+        XCTAssertEqual(store.entries().count, 1)
+        XCTAssertEqual(store.entries().first?.model, "google/gemini-2.5-flash-lite")
+        XCTAssertEqual(store.entries().first?.failure, .excessiveNovelContent)
+
+        store.record(
+            model: "openai/gpt-4o-mini",
+            input: "test input 2",
+            candidateOutput: "test candidate 2",
+            failure: .substantialExpansion,
+            inputWordCount: 3,
+            outputWordCount: 3,
+            novelWordCount: 0,
+            novelWordRatio: 0.0,
+            expansionRatio: 2.0
+        )
+        XCTAssertEqual(store.entries().count, 2)
+
+        store.record(
+            model: "meta-llama/llama-3.1-8b-instruct:nitro",
+            input: "test input 3",
+            candidateOutput: "test candidate 3",
+            failure: .commentaryWrapper,
+            inputWordCount: 3,
+            outputWordCount: 3,
+            novelWordCount: 0,
+            novelWordRatio: 0.0,
+            expansionRatio: 1.0
+        )
+        // Capacity is 2, so oldest should be evicted
+        XCTAssertEqual(store.entries().count, 2)
+        XCTAssertEqual(store.entries().first?.model, "openai/gpt-4o-mini")
+        XCTAssertEqual(store.entries().last?.model, "meta-llama/llama-3.1-8b-instruct:nitro")
+
+        store.clear()
+        XCTAssertTrue(store.entries().isEmpty)
     }
 
     private let model = "openrouter/auto"

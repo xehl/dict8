@@ -412,6 +412,7 @@ final class AppState: ObservableObject {
     @Published private(set) var temporaryAudioMaintenanceStatus: TemporaryAudioMaintenanceStatus = .pending
     @Published private(set) var transcriptionEngine: TranscriptionEngine = .local
     @Published private(set) var selectedCleanupModel: String = AIModelConfiguration.phaseZeroVerified.cleanupModel
+    @Published private(set) var cleanupDiagnostics: [CleanupDiagnosticEntry] = []
     @Published private(set) var lastError: AppShellError?
 
     let configuration: AppConfiguration
@@ -460,6 +461,14 @@ final class AppState: ObservableObject {
     func setSelectedCleanupModel(_ model: String) {
         selectedCleanupModel = model
         defaults.set(model, forKey: Self.cleanupModelDefaultsKey)
+    }
+
+    func setCleanupDiagnostics(_ diagnostics: [CleanupDiagnosticEntry]) {
+        cleanupDiagnostics = diagnostics
+    }
+
+    func clearCleanupDiagnostics() {
+        cleanupDiagnostics.removeAll()
     }
 
     var isEnabled: Bool {

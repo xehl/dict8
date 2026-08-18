@@ -36,6 +36,7 @@ struct Dict8App: App {
             openRouterClient: openRouter,
             pasteService: pasteService,
             lastDictationCache: LastDictationCache(),
+            cleanupDiagnosticStore: CleanupDiagnosticStore(),
             hotkeyMonitor: SystemHotkeyMonitor(),
             hud: RecordingHUDController(),
             metricsStore: metricsStore,
