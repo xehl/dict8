@@ -17,7 +17,8 @@ final class PhaseZeroFoundationTests: XCTestCase {
         // a single explicit model attempt (AGENTS.md §4, PRD.md §8).
         XCTAssertEqual(configuration.cleanupModel, "openrouter/auto")
         XCTAssertEqual(configuration.localTranscriptionModel, "distil-whisper/distil-large-v3")
-        XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("google/gemini-2.5-flash-lite"))
+        XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("meta-llama/llama-3.1-8b-instruct:nitro"))
+        XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("meta-llama/llama-3.2-3b-instruct"))
         XCTAssertTrue(AIModelConfiguration.fastCleanupCandidates.contains("openrouter/auto"))
     }
 

@@ -31,11 +31,11 @@ final class PhaseOneAppShellTests: XCTestCase {
         XCTAssertEqual(initialState.selectedCleanupModel, "openrouter/auto")
 
         initialState.setTranscriptionEngine(.cloud)
-        initialState.setSelectedCleanupModel("google/gemini-2.5-flash-lite")
+        initialState.setSelectedCleanupModel("meta-llama/llama-3.2-3b-instruct")
 
         let restoredState = AppState(defaults: defaults)
         XCTAssertEqual(restoredState.transcriptionEngine, .cloud)
-        XCTAssertEqual(restoredState.selectedCleanupModel, "google/gemini-2.5-flash-lite")
+        XCTAssertEqual(restoredState.selectedCleanupModel, "meta-llama/llama-3.2-3b-instruct")
     }
 
     func testCoordinatorUpdatesEnabledStateAndPresentsHUD() {

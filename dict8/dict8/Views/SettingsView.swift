@@ -649,12 +649,14 @@ struct SettingsView: View {
 
         Section("Per-Model Cleanup") {
             let cleanupMetrics = appState.usageMetrics.cleanupModelMetrics
-            if cleanupMetrics.isEmpty {
-                Text("No per-model cleanup metrics yet.")
+            let activeCandidates = Set(AIModelConfiguration.fastCleanupCandidates)
+            let displayModels = Array(cleanupMetrics.keys.filter { activeCandidates.contains($0) }.sorted())
+            if displayModels.isEmpty {
+                Text("No metrics for active cleanup candidates yet.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(cleanupMetrics.keys.sorted()), id: \.self) { model in
+                ForEach(displayModels, id: \.self) { model in
                     if let stats = cleanupMetrics[model] {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(model)
