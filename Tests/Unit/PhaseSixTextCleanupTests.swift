@@ -267,7 +267,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         let validator = CleanupOutputValidator()
         assertValidationError(.excessiveNovelContent) {
             try validator.validate(
-                output: "one two three four five six seven eight nine ten eleven twelve kiwi mango papaya guava peach plum",
+                output: "one two three four five six seven eight nine ten kiwi mango papaya guava peach plum cherry berry melon lemon",
                 against: "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen"
             )
         }

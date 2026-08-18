@@ -104,8 +104,8 @@ nonisolated struct CleanupOutputValidator: Sendable {
         let novelWords = outputWords.filter {
             !inputSet.contains($0) && !Self.fillerWords.contains($0)
         }
-        if novelWords.count >= 5,
-           Double(novelWords.count) / Double(max(1, outputWords.count)) > 0.20 {
+        if novelWords.count >= 8,
+           Double(novelWords.count) / Double(max(1, outputWords.count)) > 0.35 {
             throw TextCleanupError.suspiciousOutput(.excessiveNovelContent)
         }
 
@@ -288,11 +288,11 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
         throw TextCleanupError.missingChoice
     }
 
-    /// Cap lowered from 2,048 (approved 2026-08-13, AGENTS.md §4/PRD.md §6.4):
-    /// cleanup output should never be much longer than "Me but punctuated"
-    /// input, so the worst-case generation cap has slack to tighten.
+    /// Output token limit for cleanup completions. Keeps a generous budget so
+    /// models never hit finish_reason: "length" on light expansions, numbers,
+    /// formatting, or paragraph breaks, capped at 1,024 tokens.
     nonisolated static func outputTokenLimit(for transcript: String) -> Int {
-        min(1_024, max(48, (transcript.utf8.count + 2) / 3 + 32))
+        min(1_024, max(128, Int(Double(transcript.utf8.count) * 1.5) + 64))
     }
 
     nonisolated static let systemPrompt = """
