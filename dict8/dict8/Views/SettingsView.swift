@@ -221,22 +221,13 @@ struct SettingsView: View {
         Section("Models & Pipeline") {
             let models = AIModelConfiguration.phaseZeroVerified
             
-            Picker("Transcription Engine", selection: Binding(
-                get: { appState.transcriptionEngine },
-                set: { coordinator.setTranscriptionEngine($0) }
-            )) {
-                ForEach(AppState.TranscriptionEngine.allCases, id: \.self) { engine in
-                    Text(engine.displayName).tag(engine)
-                }
-            }
-            .pickerStyle(.menu)
-
-            if appState.transcriptionEngine == .local {
-                LabeledContent("Local Model", value: models.localTranscriptionModel)
-                LabeledContent("Hardware", value: "Apple Neural Engine (ANE)")
-            } else {
-                LabeledContent("Cloud Primary", value: models.transcriptionModel)
-                LabeledContent("Cloud Fallback", value: models.transcriptionFallbackModel)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Transcription Model")
+                Text(models.localTranscriptionModel)
+                    .font(.body)
+                Text("On-Device (Apple Neural Engine)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             Picker("Cleanup Candidate", selection: Binding(
@@ -605,48 +596,6 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var perModelMetricsSection: some View {
-        Section("Per-Model Transcription") {
-            let transcriptionMetrics = appState.usageMetrics.transcriptionModelMetrics
-            if transcriptionMetrics.isEmpty {
-                Text("No per-model transcription metrics yet.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(transcriptionMetrics.keys.sorted()), id: \.self) { model in
-                    if let stats = transcriptionMetrics[model] {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(model)
-                                .font(.subheadline.bold())
-                            HStack(spacing: 8) {
-                                Text("\(formatStatSeconds(stats.averageLatencySeconds)) avg")
-                                Text("·")
-                                Text("\(formatStatSeconds(stats.p50LatencySeconds)) p50")
-                                Text("·")
-                                Text("\(formatStatSeconds(stats.p95LatencySeconds)) p95")
-                            }
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-
-                            HStack {
-                                if let rtf = stats.realTimeFactor {
-                                    Text("\(rtf.formatted(.number.precision(.fractionLength(2))))x RTF")
-                                }
-                                if let wps = stats.wordsPerSecond {
-                                    Text("·")
-                                    Text("\(wps.formatted(.number.precision(.fractionLength(0)))) wps")
-                                }
-                                Spacer()
-                                Text("\(stats.count) req · \(formattedCost(stats.totalCost))")
-                            }
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-            }
-        }
-
         Section("Per-Model Cleanup") {
             let cleanupMetrics = appState.usageMetrics.cleanupModelMetrics
             let activeCandidates = Set(AIModelConfiguration.fastCleanupCandidates)

@@ -189,10 +189,7 @@ final class AppCoordinator {
     }
 
     private var activeSpeechToText: any SpeechToTextProviding {
-        if state.transcriptionEngine == .local, let localSpeechToText {
-            return localSpeechToText
-        }
-        return speechToText
+        localSpeechToText ?? speechToText
     }
 
     private var activeTextCleanup: any TextCleanupProviding {
