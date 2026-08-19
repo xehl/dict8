@@ -240,6 +240,7 @@ private final class FakeAccessibility: AccessibilityInspecting {
     func requestPermission() {}
     func openSystemSettings() -> Bool { true }
     func captureTarget() -> PasteTarget { target }
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? { nil }
 }
 
 @MainActor

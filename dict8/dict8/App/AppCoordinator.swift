@@ -46,6 +46,8 @@ final class AppCoordinator {
     private var cleanupExpirationTask: Task<Void, Never>?
     private var pipelineTask: Task<Void, Never>?
     private var completionResetTask: Task<Void, Never>?
+    private var spotCorrectionTask: Task<Void, Never>?
+    private let spotCorrectionDiffEngine = SpotCorrectionDiffEngine()
     private var temporaryAudioMaintenanceTask: Task<Void, Never>?
     private var testRecording: RecordedAudioFile?
     private var recordingOriginatingTarget: PasteTarget?
@@ -1156,10 +1158,14 @@ final class AppCoordinator {
             )
             try Task.checkCancellation()
             lastDictationCache.store(text)
-            return switch result {
+            let outcome: ProductionPasteOutcome = switch result {
             case .pasted: .pasted
             case .copiedBecauseTargetChanged: .copiedBecauseTargetChanged
             }
+            if outcome == .pasted {
+                scheduleSpotCorrectionObservation(pastedText: text, originatingTarget: originatingTarget)
+            }
+            return outcome
         } catch let error as TextPasteError {
             try Task.checkCancellation()
             if error == .eventCreationFailed {
@@ -1167,6 +1173,49 @@ final class AppCoordinator {
             }
             throw error
         }
+    }
+
+    private func scheduleSpotCorrectionObservation(
+        pastedText: String,
+        originatingTarget: PasteTarget
+    ) {
+        spotCorrectionTask?.cancel()
+        spotCorrectionTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            // Observe focused element text after 3 seconds and 6 seconds
+            for delay in [3, 3] {
+                try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000)
+                if Task.isCancelled { return }
+
+                guard let currentTargetApp = NSWorkspace.shared.frontmostApplication,
+                      currentTargetApp.bundleIdentifier == originatingTarget.bundleIdentifier,
+                      let currentText = accessibility.readFocusedElementText(in: currentTargetApp) else {
+                    continue
+                }
+
+                if let correction = spotCorrectionDiffEngine.findCorrection(
+                    pastedText: pastedText,
+                    editedText: currentText
+                ) {
+                    learnSpotCorrection(correction.correctedWord)
+                    return
+                }
+            }
+        }
+    }
+
+    private func learnSpotCorrection(_ newWord: String) {
+        let currentVocab = state.customVocabulary
+        let tokens = currentVocab.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard !tokens.contains(where: { $0.caseInsensitiveCompare(newWord) == .orderedSame }) else {
+            return
+        }
+
+        let updatedVocab = currentVocab.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? newWord
+            : "\(currentVocab), \(newWord)"
+        state.setCustomVocabulary(updatedVocab)
+        hud.showFeedback(.spotCorrectionLearned(newWord))
     }
 
     private func deleteProductionRecording(

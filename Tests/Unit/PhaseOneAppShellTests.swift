@@ -165,6 +165,7 @@ private final class FakeAccessibilityService: AccessibilityInspecting {
             secureFieldStatus: .notSecure
         )
     }
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? { nil }
 }
 
 @MainActor

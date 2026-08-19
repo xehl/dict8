@@ -219,6 +219,40 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(executions.count, 2)
     }
 
+    func testSpotCorrectionDiffEngineLearnsSingleWordFixes() {
+        let engine = SpotCorrectionDiffEngine()
+
+        // Single letter correction (Devon -> Devin)
+        let fix1 = engine.findCorrection(
+            pastedText: "I talked with Devon from Cognition",
+            editedText: "I talked with Devin from Cognition"
+        )
+        XCTAssertEqual(fix1?.originalWord, "Devon")
+        XCTAssertEqual(fix1?.correctedWord, "Devin")
+
+        // Capitalization correction (infisical -> Infisical)
+        let fix2 = engine.findCorrection(
+            pastedText: "we deployed to infisical yesterday",
+            editedText: "we deployed to Infisical yesterday"
+        )
+        XCTAssertEqual(fix2?.originalWord, "infisical")
+        XCTAssertEqual(fix2?.correctedWord, "Infisical")
+
+        // Complete rewrite / major edit should NOT trigger learning
+        let rewrite = engine.findCorrection(
+            pastedText: "I went to the store to buy apples",
+            editedText: "We need to fix the deployment pipeline immediately"
+        )
+        XCTAssertNil(rewrite)
+
+        // Identical text should not trigger
+        let same = engine.findCorrection(
+            pastedText: "same exact text",
+            editedText: "same exact text"
+        )
+        XCTAssertNil(same)
+    }
+
     func testValidatorAllowsLightCleanupAndPromptInjectionAsDictatedText() throws {
         let validator = CleanupOutputValidator()
         let casual = try validator.validate(
@@ -539,6 +573,7 @@ private actor CleanupAPIKeyStore: APIKeyStoring {
     func captureTarget() -> PasteTarget {
         PasteTarget(bundleIdentifier: "test", processIdentifier: 1, secureFieldStatus: .notSecure)
     }
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? { nil }
 }
 
 @MainActor private final class CleanupMicrophonePermission: MicrophonePermissionControlling {

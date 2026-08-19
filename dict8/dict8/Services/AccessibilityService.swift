@@ -59,6 +59,7 @@ protocol AccessibilityInspecting: AnyObject {
     func requestPermission()
     func openSystemSettings() -> Bool
     func captureTarget() -> PasteTarget
+    func readFocusedElementText(in application: NSRunningApplication?) -> String?
 }
 
 @MainActor
@@ -111,6 +112,18 @@ final class SystemAccessibilityService: AccessibilityInspecting {
             ? .notSecure
             : .unknown
         return target(for: application, secureFieldStatus: status)
+    }
+
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? {
+        guard AXIsProcessTrusted(),
+              let app = application ?? NSWorkspace.shared.frontmostApplication else {
+            return nil
+        }
+        let applicationElement = AXUIElementCreateApplication(app.processIdentifier)
+        guard let focusedElement = focusedElement(in: applicationElement) else {
+            return nil
+        }
+        return stringAttribute(kAXValueAttribute, from: focusedElement)
     }
 
     private func target(

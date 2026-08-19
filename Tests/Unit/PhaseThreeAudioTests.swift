@@ -602,6 +602,7 @@ private final class FakeAudioAccessibility: AccessibilityInspecting {
             secureFieldStatus: secureFieldStatus
         )
     }
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? { nil }
 }
 
 @MainActor

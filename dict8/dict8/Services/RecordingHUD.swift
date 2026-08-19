@@ -10,6 +10,7 @@ enum TransientFeedback: Equatable, Sendable {
     case recordingCueFailed
     case transcriptionFallbackUsed
     case cleanupRawFallback
+    case spotCorrectionLearned(String)
     case temporaryAudioCleanupFailed
 
     var symbolName: String {
@@ -22,6 +23,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .recordingCueFailed: "speaker.slash"
         case .transcriptionFallbackUsed: "arrow.trianglehead.2.clockwise.rotate.90"
         case .cleanupRawFallback: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
+        case .spotCorrectionLearned: "character.book.closed.fill"
         case .temporaryAudioCleanupFailed: "trash.slash"
         }
     }
@@ -36,6 +38,7 @@ enum TransientFeedback: Equatable, Sendable {
         case .recordingCueFailed: "Recording cue failed — processing continued"
         case .transcriptionFallbackUsed: "Transcription fallback model used"
         case .cleanupRawFallback: "Cleanup failed — pasted raw transcript"
+        case let .spotCorrectionLearned(term): "Learned \"\(term)\""
         case .temporaryAudioCleanupFailed: "Temporary audio could not be deleted"
         }
     }

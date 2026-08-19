@@ -552,6 +552,7 @@ private final class PipelineAccessibility: AccessibilityInspecting {
             secureFieldStatus: .notSecure
         )
     }
+    func readFocusedElementText(in application: NSRunningApplication?) -> String? { nil }
 }
 
 @MainActor
