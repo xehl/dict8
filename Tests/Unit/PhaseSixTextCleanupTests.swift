@@ -29,9 +29,9 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         // The deadline passed to transport is the remaining time computed
         // from a ContinuousClock at call time (to support the zero-
         // completion retry's shared budget), so it is slightly under the
-        // nominal 10s rather than exactly equal.
-        XCTAssertLessThanOrEqual(execution.deadline, .seconds(10))
-        XCTAssertGreaterThan(execution.deadline, .seconds(9))
+        // nominal 3.5s rather than exactly equal.
+        XCTAssertLessThanOrEqual(execution.deadline, .seconds(3.5))
+        XCTAssertGreaterThan(execution.deadline, .seconds(2.5))
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0]["role"] as? String, "system")
         XCTAssertEqual(messages[0]["content"] as? String, OpenRouterTextCleanupService.systemPrompt)
@@ -240,7 +240,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertTrue(restarted.hasPrefix("The main issue"))
     }
 
-    func testValidatorRejectsFencesWrappersAndExpansion() {
+    func testValidatorRejectsFencesWrappersAndExpansion() throws {
         let validator = CleanupOutputValidator()
         assertValidationError(.markdownFence) {
             try validator.validate(
@@ -248,12 +248,12 @@ final class PhaseSixTextCleanupTests: XCTestCase {
                 against: "keep this source sentence intact"
             )
         }
-        assertValidationError(.commentaryWrapper) {
-            try validator.validate(
-                output: "Here is the revised text: Keep this source sentence intact.",
-                against: "keep this source sentence intact"
-            )
-        }
+        // Stripped commentary wrapper returns clean body
+        let cleaned = try validator.validate(
+            output: "Here is the revised text: Keep this source sentence intact.",
+            against: "keep this source sentence intact"
+        )
+        XCTAssertEqual(cleaned, "Keep this source sentence intact.")
         let input = String(repeating: "source words remain here ", count: 12)
         assertValidationError(.substantialExpansion) {
             try validator.validate(

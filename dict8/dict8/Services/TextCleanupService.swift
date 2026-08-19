@@ -115,7 +115,17 @@ nonisolated struct CleanupValidationMetrics: Equatable, Sendable {
 
 nonisolated struct CleanupOutputValidator: Sendable {
     func evaluate(output: String, against input: String, customVocabulary: String = "") -> (cleaned: String, failure: CleanupValidationFailure?, metrics: CleanupValidationMetrics) {
-        let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        var cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerInput = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        // Strip known commentary preambles (e.g. "Here is the cleaned text: ...")
+        if !lowerInput.hasPrefix("here is") && !lowerInput.hasPrefix("here's") && !lowerInput.hasPrefix("cleaned text") {
+            let stripped = Self.stripCommentaryPrefix(from: cleaned)
+            if !stripped.isEmpty {
+                cleaned = stripped
+            }
+        }
+
         let inputWords = Self.words(in: input)
         let outputWords = Self.words(in: cleaned)
         let vocabWords = Self.words(in: customVocabulary)
@@ -141,7 +151,6 @@ nonisolated struct CleanupOutputValidator: Sendable {
         }
 
         let lowerOutput = cleaned.lowercased()
-        let lowerInput = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if Self.commentaryPrefixes.contains(where: {
             lowerOutput.hasPrefix($0) && !lowerInput.hasPrefix($0)
         }) {
@@ -214,13 +223,41 @@ nonisolated struct CleanupOutputValidator: Sendable {
     }
 
     private static let commentaryPrefixes = [
+        "here is the cleaned text",
+        "here's the cleaned text",
         "here is the cleaned",
         "here's the cleaned",
+        "here is the revised text",
+        "here's the revised text",
         "here is the revised",
         "here's the revised",
         "cleaned text:",
         "revised text:",
+        "cleaned version:",
+        "revised version:",
+        "here is what you said:",
+        "here's what you said:",
     ]
+
+    private static func stripCommentaryPrefix(from output: String) -> String {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        for prefix in commentaryPrefixes {
+            if lower.hasPrefix(prefix) {
+                var remainder = trimmed.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Remove optional leading colon or dashes
+                if remainder.hasPrefix(":") || remainder.hasPrefix("-") {
+                    remainder = remainder.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                // Strip surrounding quotes if wrapped
+                if remainder.hasPrefix("\"") && remainder.hasSuffix("\"") && remainder.count >= 2 {
+                    remainder = String(remainder.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                return remainder
+            }
+        }
+        return trimmed
+    }
 
     private static let fillerWords: Set<String> = [
         "ah", "basically", "er", "hmm", "kinda", "like", "literally", "sorta", "uh", "um",
@@ -228,11 +265,10 @@ nonisolated struct CleanupOutputValidator: Sendable {
 }
 
 actor OpenRouterTextCleanupService: TextCleanupProviding {
-    /// Lowered from 30s (approved 2026-08-13, AGENTS.md §4/PRD.md §6.4): cleanup
-    /// is a low-stakes "lightly punctuate this" task, so failing fast into the
-    /// raw-transcript fallback path is preferred over waiting out a slow
-    /// Auto Router pick.
-    static let defaultDeadline: Duration = .seconds(10)
+    /// Lowered from 10s (approved 2026-08-18): cleanup is a low-stakes
+    /// "lightly punctuate this" task, so failing fast into the raw-transcript
+    /// fallback path after 3.5 seconds eliminates noticeable UI hangs.
+    static let defaultDeadline: Duration = .seconds(3.5)
     static let temperature = 0.1
     /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
     /// OpenRouter's Auto Router (stable slug, `openrouter/auto`) at the

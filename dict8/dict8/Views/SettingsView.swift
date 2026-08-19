@@ -265,14 +265,14 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Custom Vocabulary")
                 TextField(
-                    "e.g. OpenRouter, Infisical, Jon Tuite, Abdalla",
+                    "e.g. OpenRouter, Infisical, Devin, Jon Tuite, Abdalla",
                     text: Binding(
                         get: { appState.customVocabulary },
                         set: { coordinator.setCustomVocabulary($0) }
                     )
                 )
                 .textFieldStyle(.roundedBorder)
-                Text("Comma-separated proper nouns and technical terms.")
+                Text("Comma-separated proper nouns, acronyms, or phonetic spellings (e.g. Devin, Infisical).")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -710,14 +710,24 @@ struct SettingsView: View {
                                 .font(.caption2.bold())
                                 .foregroundStyle(.orange)
                         }
-                        Text("In: \"\(entry.input)\"")
-                            .font(.caption2)
-                            .lineLimit(2)
-                            .foregroundStyle(.secondary)
-                        Text("Out: \"\(entry.candidateOutput)\"")
-                            .font(.caption2)
-                            .lineLimit(2)
-                            .foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("In:")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                            Text(entry.input)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Out:")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.primary)
+                            Text(entry.candidateOutput)
+                                .font(.caption2)
+                                .foregroundStyle(.primary)
+                                .textSelection(.enabled)
+                        }
                         HStack(spacing: 8) {
                             Text("Novel: \(entry.novelWordCount)w (\(Int(entry.novelWordRatio * 100))%)")
                                 .font(.caption2)
