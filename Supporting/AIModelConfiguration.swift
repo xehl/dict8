@@ -20,8 +20,6 @@ nonisolated struct AIModelConfiguration: Equatable, Sendable {
     static let fastCleanupCandidates: [String] = [
         "meta-llama/llama-3.1-8b-instruct:nitro",
         "meta-llama/llama-3.2-3b-instruct",
-        "meta-llama/llama-3.2-1b-instruct",
-        "mistralai/ministral-3b-2512",
         "qwen/qwen-2.5-7b-instruct",
         "openrouter/auto",
     ]
