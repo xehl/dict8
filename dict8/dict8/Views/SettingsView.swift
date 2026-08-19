@@ -75,7 +75,7 @@ struct SettingsView: View {
     /// resizing to their content. Lowered by ~80pt (roughly two form rows,
     /// 2026-08-13 per Eric) to trim unneeded trailing whitespace below the
     /// shorter columns' content.
-    private let columnHeight: CGFloat = 700
+    private let columnHeight: CGFloat = 800
 
     @ViewBuilder
     private var generalSection: some View {
@@ -683,10 +683,10 @@ struct SettingsView: View {
             }
         }
 
-        Section("Recent Validation Diagnostics") {
+        Section("Recent Dictation Diagnostics") {
             let diagnostics = appState.cleanupDiagnostics
             if diagnostics.isEmpty {
-                Text("No recent validation rejections.")
+                Text("No recent dictation diagnostics.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
@@ -700,15 +700,21 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                 }
-                ForEach(diagnostics) { entry in
+                ForEach(diagnostics.reversed()) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(entry.model)
                                 .font(.caption.bold())
                             Spacer()
-                            Text(entry.failure.displayName)
-                                .font(.caption2.bold())
-                                .foregroundStyle(.orange)
+                            if let failure = entry.failure {
+                                Text(failure.displayName)
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.orange)
+                            } else {
+                                Text("Cleaned")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.green)
+                            }
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text("In:")

@@ -382,7 +382,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             model: "meta-llama/llama-3.1-8b-instruct:nitro",
             input: "test input 3",
             candidateOutput: "test candidate 3",
-            failure: .commentaryWrapper,
+            failure: nil,
             inputWordCount: 3,
             outputWordCount: 3,
             novelWordCount: 0,
@@ -393,6 +393,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(store.entries().count, 2)
         XCTAssertEqual(store.entries().first?.model, "openai/gpt-4o-mini")
         XCTAssertEqual(store.entries().last?.model, "meta-llama/llama-3.1-8b-instruct:nitro")
+        XCTAssertNil(store.entries().last?.failure)
 
         store.clear()
         XCTAssertTrue(store.entries().isEmpty)

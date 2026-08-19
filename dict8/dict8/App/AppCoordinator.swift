@@ -708,6 +708,20 @@ final class AppCoordinator {
                 self.state.setStatus(.completed)
                 self.state.clearError()
                 self.scheduleCleanupTestExpiration()
+
+                let eval = CleanupOutputValidator().evaluate(output: result.text, against: rawText, customVocabulary: self.state.customVocabulary)
+                self.cleanupDiagnosticStore.record(
+                    model: result.model,
+                    input: rawText,
+                    candidateOutput: result.text,
+                    failure: nil,
+                    inputWordCount: eval.metrics.inputWordCount,
+                    outputWordCount: eval.metrics.outputWordCount,
+                    novelWordCount: eval.metrics.novelWordCount,
+                    novelWordRatio: eval.metrics.novelWordRatio,
+                    expansionRatio: eval.metrics.expansionRatio
+                )
+                self.refreshCleanupDiagnostics()
             } catch is CancellationError {
                 return
             } catch let error as TextCleanupError {
@@ -1043,6 +1057,20 @@ final class AppCoordinator {
             try Task.checkCancellation()
             finalText = result.text
             cleanupCost = result.usage?.cost
+
+            let eval = CleanupOutputValidator().evaluate(output: finalText, against: transcription.text, customVocabulary: state.customVocabulary)
+            cleanupDiagnosticStore.record(
+                model: cleanupModelForMetrics ?? state.selectedCleanupModel,
+                input: transcription.text,
+                candidateOutput: finalText,
+                failure: nil,
+                inputWordCount: eval.metrics.inputWordCount,
+                outputWordCount: eval.metrics.outputWordCount,
+                novelWordCount: eval.metrics.novelWordCount,
+                novelWordRatio: eval.metrics.novelWordRatio,
+                expansionRatio: eval.metrics.expansionRatio
+            )
+            refreshCleanupDiagnostics()
         } catch is CancellationError {
             cleanupDuration = cleanupStart.duration(to: clock.now)
             finishCancelledPipeline(generation: generation)

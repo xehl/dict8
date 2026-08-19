@@ -7,7 +7,7 @@ nonisolated struct CleanupDiagnosticEntry: Identifiable, Equatable, Sendable {
     let model: String
     let input: String
     let candidateOutput: String
-    let failure: CleanupValidationFailure
+    let failure: CleanupValidationFailure?
     let inputWordCount: Int
     let outputWordCount: Int
     let novelWordCount: Int
@@ -21,7 +21,7 @@ nonisolated struct CleanupDiagnosticEntry: Identifiable, Equatable, Sendable {
         model: String,
         input: String,
         candidateOutput: String,
-        failure: CleanupValidationFailure,
+        failure: CleanupValidationFailure?,
         inputWordCount: Int,
         outputWordCount: Int,
         novelWordCount: Int,
@@ -50,7 +50,7 @@ protocol CleanupDiagnosticLogging: AnyObject {
         model: String,
         input: String,
         candidateOutput: String,
-        failure: CleanupValidationFailure,
+        failure: CleanupValidationFailure?,
         inputWordCount: Int,
         outputWordCount: Int,
         novelWordCount: Int,
@@ -67,7 +67,7 @@ final class NoOpCleanupDiagnosticStore: CleanupDiagnosticLogging {
         model: String,
         input: String,
         candidateOutput: String,
-        failure: CleanupValidationFailure,
+        failure: CleanupValidationFailure?,
         inputWordCount: Int,
         outputWordCount: Int,
         novelWordCount: Int,
@@ -84,28 +84,22 @@ final class NoOpCleanupDiagnosticStore: CleanupDiagnosticLogging {
 
 @MainActor
 final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
-    static let maxEntries = 20
-    static let defaultLifetime: TimeInterval = 10 * 60
+    static let defaultCapacity = 20
+    static let defaultLifetime: TimeInterval = 600 // 10 minutes
 
     private let capacity: Int
     private let lifetime: TimeInterval
-    private let now: () -> Date
-    private let notificationCenter: NotificationCenter
     private var buffer: [CleanupDiagnosticEntry] = []
-    private var privacyObservers: [NSObjectProtocol] = []
+    private var privacyObservers: [any NSObjectProtocol] = []
 
     init(
-        capacity: Int = CleanupDiagnosticStore.maxEntries,
+        capacity: Int = CleanupDiagnosticStore.defaultCapacity,
         lifetime: TimeInterval = CleanupDiagnosticStore.defaultLifetime,
-        now: @escaping () -> Date = Date.init,
         notificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
         privacyNotifications: [Notification.Name] = LastDictationCache.v0PrivacyNotifications
     ) {
-        self.capacity = capacity
-        self.lifetime = lifetime
-        self.now = now
-        self.notificationCenter = notificationCenter
-
+        self.capacity = max(1, capacity)
+        self.lifetime = max(1, lifetime)
         privacyObservers = privacyNotifications.map { notificationName in
             notificationCenter.addObserver(
                 forName: notificationName,
@@ -123,7 +117,7 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
         model: String,
         input: String,
         candidateOutput: String,
-        failure: CleanupValidationFailure,
+        failure: CleanupValidationFailure?,
         inputWordCount: Int,
         outputWordCount: Int,
         novelWordCount: Int,
@@ -131,8 +125,8 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
         expansionRatio: Double
     ) {
         pruneExpired()
+        let expiresAt = Date().addingTimeInterval(lifetime)
         let entry = CleanupDiagnosticEntry(
-            timestamp: now(),
             model: model,
             input: input,
             candidateOutput: candidateOutput,
@@ -142,7 +136,7 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
             novelWordCount: novelWordCount,
             novelWordRatio: novelWordRatio,
             expansionRatio: expansionRatio,
-            expiresAt: now().addingTimeInterval(lifetime)
+            expiresAt: expiresAt
         )
         buffer.append(entry)
         if buffer.count > capacity {
@@ -160,7 +154,7 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
     }
 
     private func pruneExpired() {
-        let current = now()
+        let current = Date()
         buffer.removeAll { $0.expiresAt <= current }
     }
 }
