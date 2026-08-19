@@ -406,7 +406,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             customVocabulary: "OpenRouter, Infisical, Jon Tuite, Abdalla"
         )
         let prompt = OpenRouterTextCleanupService.buildSystemPrompt(context: context)
-        XCTAssertTrue(prompt.contains("Custom vocabulary and proper noun spellings to respect:"))
+        XCTAssertTrue(prompt.contains("Custom vocabulary and proper nouns:"))
         XCTAssertTrue(prompt.contains("OpenRouter, Infisical, Jon Tuite, Abdalla"))
         XCTAssertTrue(prompt.contains("Target application: Cursor"))
         XCTAssertTrue(prompt.contains("code editor/terminal"))

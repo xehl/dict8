@@ -425,7 +425,15 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
 
         let vocab = context.customVocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
         if !vocab.isEmpty {
-            prompt += "\n\nCustom vocabulary and proper noun spellings to respect:\n\(vocab)"
+            prompt += """
+
+
+            Custom vocabulary and proper nouns:
+            \(vocab)
+
+            VOCABULARY CORRECTION RULE:
+            Actively correct phonetic speech-to-text errors and near-matches to the exact proper nouns listed above (for example, fix 'Devon' -> 'Devin', 'John Twight' -> 'Jon Tuite', 'in physical' -> 'Infisical', 'open router' -> 'OpenRouter').
+            """
         }
 
         if let appName = context.targetAppName, !appName.isEmpty {
