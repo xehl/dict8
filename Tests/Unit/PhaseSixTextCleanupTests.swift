@@ -282,17 +282,18 @@ final class PhaseSixTextCleanupTests: XCTestCase {
                 against: "keep this source sentence intact"
             )
         }
-        // Stripped commentary wrapper returns clean body
+        // Stripped commentary wrapper / tag envelope returns clean body
         let cleaned = try validator.validate(
-            output: "Here is the revised text: Keep this source sentence intact.",
+            output: "Here is the revised text:\n\n<cleaned>Keep this source sentence intact.</cleaned>\n\nHope that helps!",
             against: "keep this source sentence intact"
         )
         XCTAssertEqual(cleaned, "Keep this source sentence intact.")
-        let input = String(repeating: "source words remain here ", count: 12)
-        assertValidationError(.substantialExpansion) {
+
+        // Unwrapped conversational preamble without tags is rejected
+        assertValidationError(.commentaryWrapper) {
             try validator.validate(
-                output: input + String(repeating: "new invented explanation ", count: 12),
-                against: input
+                output: "Here is the revised text: Keep this source sentence intact.",
+                against: "keep this source sentence intact"
             )
         }
     }
@@ -301,7 +302,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         let validator = CleanupOutputValidator()
         // Contractions and simple light adjustments on short input
         let cleaned = try validator.validate(
-            output: "I do not think we can make it today.",
+            output: "<cleaned>I do not think we can make it today.</cleaned>",
             against: "dont think we can make it today"
         )
         XCTAssertEqual(cleaned, "I do not think we can make it today.")
