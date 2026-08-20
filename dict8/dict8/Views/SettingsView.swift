@@ -254,19 +254,6 @@ struct SettingsView: View {
             }
             .pickerStyle(.menu)
 
-            if appState.selectedCleanupModel == "openrouter/auto" {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Cleanup routing")
-                    Text(
-                        "Auto Router — cost tier: \(OpenRouterTextCleanupService.autoRouterSettings.costTier.rawValue)"
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-            } else {
-                LabeledContent("Routing Mode", value: "Pinned Fast Cloud Candidate")
-            }
-
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -317,21 +304,9 @@ struct SettingsView: View {
                 value: metrics.cleanupFallbackCount.formatted()
             )
             LabeledContent(
-                "Startup audio cleanup",
-                value: appState.temporaryAudioMaintenanceStatus.displayName
-            )
-            LabeledContent(
                 "Last issue",
                 value: metrics.lastIssueCategory?.displayName ?? "None"
             )
-            if let top = metrics.topCleanupFallbackReason {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Top fallback reason")
-                    Text("\(top.reason.displayName) (\(top.count.formatted()))")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
     }
 
