@@ -84,7 +84,7 @@ final class NoOpCleanupDiagnosticStore: CleanupDiagnosticLogging {
 
 @MainActor
 final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
-    static let defaultCapacity = 20
+    static let defaultCapacity = 3
     static let defaultLifetime: TimeInterval = 600 // 10 minutes
 
     private let capacity: Int
