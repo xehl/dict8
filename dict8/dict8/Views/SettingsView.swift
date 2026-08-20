@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @State private var apiKey = ""
+    @State private var isCustomVocabularySheetPresented = false
+    @State private var vocabularyDraft = ""
 
     let coordinator: AppCoordinator
 
@@ -54,6 +56,18 @@ struct SettingsView: View {
             .padding(.trailing, 16)
         }
         .frame(width: 1485, height: columnHeight)
+        .sheet(isPresented: $isCustomVocabularySheetPresented) {
+            CustomVocabularySheetView(
+                vocabularyDraft: $vocabularyDraft,
+                onSave: { updated in
+                    coordinator.setCustomVocabulary(updated)
+                    isCustomVocabularySheetPresented = false
+                },
+                onDismiss: {
+                    isCustomVocabularySheetPresented = false
+                }
+            )
+        }
         .onAppear {
             coordinator.refreshConfiguration()
         }
@@ -253,17 +267,29 @@ struct SettingsView: View {
                 LabeledContent("Routing Mode", value: "Pinned Fast Cloud Candidate")
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Custom Vocabulary")
-                TextField(
-                    "e.g. OpenRouter, Infisical, Devin, Jon Tuite, Abdalla",
-                    text: Binding(
-                        get: { appState.customVocabulary },
-                        set: { coordinator.setCustomVocabulary($0) }
-                    )
-                )
-                .textFieldStyle(.roundedBorder)
-                Text("Comma-separated proper nouns, acronyms, or phonetic spellings (e.g. Devin, Infisical).")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Custom Vocabulary")
+                        let termCount = appState.customVocabulary
+                            .split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            .filter { !$0.isEmpty }
+                            .count
+                        Text(termCount == 0 ? "No terms recorded yet" : "\(termCount) active term\(termCount == 1 ? "" : "s") (auto-learned)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Manage Glossary…") {
+                        vocabularyDraft = appState.customVocabulary
+                        isCustomVocabularySheetPresented = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                Text("Terms are automatically learned from spot corrections after pasting, or managed via the glossary.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -778,5 +804,136 @@ private struct CostStatCell: View {
     private var formatted: String {
         guard let value else { return "—" }
         return "$" + value.formatted(.number.precision(.fractionLength(6)))
+    }
+}
+
+private struct CustomVocabularySheetView: View {
+    @Binding var vocabularyDraft: String
+    let onSave: (String) -> Void
+    let onDismiss: () -> Void
+
+    @State private var newTermInput = ""
+
+    private var terms: [String] {
+        vocabularyDraft
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Custom Vocabulary & Glossary")
+                        .font(.headline)
+                    Text("Terms are actively used by the cleanup model to correct phonetic STT errors and preserve domain terms.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Done") {
+                    onSave(vocabularyDraft)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+
+            HStack(spacing: 8) {
+                TextField("Add new term or proper noun (e.g. Devin, Infisical, Jon Tuite)", text: $newTermInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        addTerm()
+                    }
+                Button("Add") {
+                    addTerm()
+                }
+                .disabled(newTermInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Active Terms (\(terms.count))")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    if !terms.isEmpty {
+                        Button("Clear All") {
+                            vocabularyDraft = ""
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
+                }
+
+                if terms.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "character.book.closed")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                        Text("No terms in glossary yet.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text("Dict8 automatically learns terms when you spot-correct words within 5–6 seconds of pasting, or you can add them above.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.vertical, 24)
+                } else {
+                    List {
+                        ForEach(terms, id: \.self) { term in
+                            HStack {
+                                Text(term)
+                                    .font(.body)
+                                Spacer()
+                                Button {
+                                    removeTerm(term)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .listStyle(.inset)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+
+            HStack {
+                Text("Raw comma-separated text:")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            TextField("Raw terms", text: $vocabularyDraft)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption.monospaced())
+        }
+        .padding(20)
+        .frame(width: 520, height: 460)
+    }
+
+    private func addTerm() {
+        let trimmed = newTermInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        var current = terms
+        if !current.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            current.append(trimmed)
+            vocabularyDraft = current.joined(separator: ", ")
+        }
+        newTermInput = ""
+    }
+
+    private func removeTerm(_ term: String) {
+        var current = terms
+        current.removeAll(where: { $0.caseInsensitiveCompare(term) == .orderedSame })
+        vocabularyDraft = current.joined(separator: ", ")
     }
 }
