@@ -622,6 +622,10 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
 
                             HStack {
+                                if let wps = stats.wordsPerSecond {
+                                    Text("\(wps.formatted(.number.precision(.fractionLength(0)))) wps")
+                                    Text("·")
+                                }
                                 Text("\(stats.count) req · \(formattedCost(stats.totalCost))")
                             }
                             .font(.caption2)

@@ -243,6 +243,7 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
         self.usedRawCleanupFallback = usedRawCleanupFallback
         self.issueCategory = issueCategory
         self.cleanupFailureReason = cleanupFailureReason
+        DictationTelemetryLogger.log(self)
     }
 }
 
@@ -426,7 +427,8 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             var modelSnapshot = cleanupModelMetrics[model] ?? ModelMetricsSnapshot()
             modelSnapshot.record(
                 latencySeconds: Self.validSeconds(event.cleanupLatency),
-                cost: event.cleanupCost
+                cost: event.cleanupCost,
+                wordCount: event.transcriptWordCount
             )
             cleanupModelMetrics[model] = modelSnapshot
         }
@@ -588,6 +590,88 @@ nonisolated struct UsageMetricsSnapshot: Codable, Equatable, Sendable {
             [String: ModelMetricsSnapshot].self,
             forKey: .cleanupModelMetrics
         ) ?? [:]
+    }
+}
+
+/// Persistent content-free telemetry log recorded to ~/.dict8/telemetry.json
+/// for local telemetry visualization on the OpenRouter Personal Scoreboard.
+nonisolated enum DictationTelemetryLogger {
+    static let directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dict8")
+    static let fileURL = directoryURL.appendingPathComponent("telemetry.json")
+
+    struct Record: Codable {
+        let timestamp: String
+        let outcome: String
+        let model: String
+        let stage: String
+        let latencyMs: Double
+        let costUsd: Double
+        let wordCount: Int
+        let usedFallback: Bool
+    }
+
+    static func log(_ event: DictationMetricEvent) {
+        // Prevent unit tests / mock test runs from polluting production telemetry
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.arguments.contains("-XCTest") {
+            return
+        }
+
+        Task.detached(priority: .background) {
+            let now = ISO8601DateFormatter().string(from: Date())
+            var records: [Record] = []
+
+            if let model = event.cleanupModel, !model.isEmpty {
+                let latencyMs = event.cleanupLatency.map { Double($0.components.seconds) * 1000.0 + Double($0.components.attoseconds) / 1_000_000_000_000_000.0 } ?? 0.0
+                records.append(Record(
+                    timestamp: now,
+                    outcome: event.outcome.rawValue,
+                    model: model,
+                    stage: "cleanup",
+                    latencyMs: latencyMs,
+                    costUsd: event.cleanupCost ?? 0.0,
+                    wordCount: event.transcriptWordCount ?? 0,
+                    usedFallback: event.usedRawCleanupFallback
+                ))
+            }
+
+            if let model = event.transcriptionModel, !model.isEmpty, model != "local-whisper" {
+                let latencyMs = event.transcriptionLatency.map { Double($0.components.seconds) * 1000.0 + Double($0.components.attoseconds) / 1_000_000_000_000_000.0 } ?? 0.0
+                records.append(Record(
+                    timestamp: now,
+                    outcome: event.outcome.rawValue,
+                    model: model,
+                    stage: "transcription",
+                    latencyMs: latencyMs,
+                    costUsd: event.transcriptionCost ?? 0.0,
+                    wordCount: event.transcriptWordCount ?? 0,
+                    usedFallback: false
+                ))
+            }
+
+            guard !records.isEmpty else { return }
+
+            do {
+                try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+                for record in records {
+                    let data = try JSONEncoder().encode(record)
+                    if let line = String(data: data, encoding: .utf8) {
+                        let lineWithNewline = line + "\n"
+                        if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
+                            defer { try? fileHandle.close() }
+                            _ = try? fileHandle.seekToEnd()
+                            if let lineData = lineWithNewline.data(using: .utf8) {
+                                try? fileHandle.write(contentsOf: lineData)
+                            }
+                        } else {
+                            try? lineWithNewline.write(to: fileURL, atomically: true, encoding: .utf8)
+                        }
+                    }
+                }
+            } catch {
+                // Background telemetry should never disrupt main flow
+            }
+        }
     }
 }
 

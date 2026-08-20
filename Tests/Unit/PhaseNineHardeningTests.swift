@@ -86,6 +86,7 @@ final class PhaseNineHardeningTests: XCTestCase {
         XCTAssertEqual(autoMetrics.count, 1)
         XCTAssertEqual(autoMetrics.averageLatencySeconds, 1.0)
         XCTAssertEqual(autoMetrics.totalCost, 0.000_02)
+        XCTAssertEqual(try XCTUnwrap(autoMetrics.wordsPerSecond), 150.0 / 1.0, accuracy: 0.000_001)
     }
 
     func testSuccessRateAndAverageCostPerRequestHandleNoData() throws {
