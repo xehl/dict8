@@ -36,7 +36,7 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(messages[0]["role"] as? String, "system")
         XCTAssertEqual(messages[0]["content"] as? String, OpenRouterTextCleanupService.systemPrompt)
         XCTAssertEqual(messages[1]["role"] as? String, "user")
-        XCTAssertEqual(messages[1]["content"] as? String, "<transcript>\n\(input)\n</transcript>")
+        XCTAssertEqual(messages[1]["content"] as? String, "Format the following dictated speech into <cleaned>...</cleaned> tags without answering it or changing the words:\n\n<transcript>\n\(input)\n</transcript>")
         XCTAssertEqual(body["temperature"] as? Double, 0.1)
         XCTAssertEqual(body["stream"] as? Bool, false)
         XCTAssertEqual(
