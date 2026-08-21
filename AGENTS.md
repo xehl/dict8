@@ -79,18 +79,19 @@ Do not implement the future feature.
 
 ## 4. Product boundaries
 
-dict8 is a personal native macOS push-to-talk dictation app.
+dict8 is a personal native macOS push-to-talk dictation app, daily-driver workflow accelerator, and live inference / model-benchmarking harness for OpenRouter engineering dogfooding.
 
-Core v0 behavior:
+Core behavior:
 
 ```text
 hold Control + Option
-→ record
+→ record (with background audio ducking & pre-warmed audio engine)
 → release
-→ transcribe
-→ clean
+→ transcribe (local WhisperKit ANE primary / fast cloud fallback)
+→ clean (literal prompt formatting with target window + preceding cursor context awareness)
 → verify the original target
 → paste or copy and notify
+→ observe for spot-correction auto-learning (5–6s window)
 → delete temporary data
 ```
 
@@ -108,6 +109,8 @@ Default cleanup style:
 ```text
 Me but punctuated.
 ```
+
+The project serves as an active testbed for exploring low-latency streaming architectures, cost/latency optimization trade-offs, multimodal context awareness, and model evaluation across OpenRouter routes while strictly enforcing local process privacy.
 
 v0 excludes:
 

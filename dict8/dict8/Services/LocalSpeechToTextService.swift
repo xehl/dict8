@@ -4,11 +4,13 @@ import Foundation
 
 protocol LocalWhisperTranscribing: Sendable {
     func transcribeAudioFile(at url: URL) async throws -> String
+    func transcribeAudioSamples(_ samples: [Float]) async throws -> String
     func prewarm() async
 }
 
 extension LocalWhisperTranscribing {
     func prewarm() async {}
+    func transcribeAudioSamples(_ samples: [Float]) async throws -> String { "" }
 }
 
 final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
@@ -53,6 +55,18 @@ final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
         do {
             let pipe = try await getOrInitializeWhisperKit()
             let results = try await pipe.transcribe(audioPath: url.path)
+            let fullText = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            return fullText
+        } catch {
+            throw SpeechToTextError.localTranscriptionFailed(error.localizedDescription)
+        }
+    }
+
+    nonisolated func transcribeAudioSamples(_ samples: [Float]) async throws -> String {
+        guard !samples.isEmpty else { return "" }
+        do {
+            let pipe = try await getOrInitializeWhisperKit()
+            let results = try await pipe.transcribe(audioArray: samples)
             let fullText = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
             return fullText
         } catch {
