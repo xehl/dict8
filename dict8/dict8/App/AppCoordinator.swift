@@ -1046,7 +1046,9 @@ final class AppCoordinator {
             let context = CleanupContext(
                 targetAppName: originatingTarget.localizedName,
                 targetBundleID: originatingTarget.bundleIdentifier,
-                customVocabulary: state.customVocabulary
+                customVocabulary: state.customVocabulary,
+                windowTitle: originatingTarget.windowTitle,
+                precedingText: originatingTarget.precedingText
             )
             let result = try await activeTextCleanup.clean(transcription.text, context: context)
             cleanupDuration = cleanupStart.duration(to: clock.now)

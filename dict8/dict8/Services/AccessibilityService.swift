@@ -27,17 +27,23 @@ struct PasteTarget: Equatable, Sendable {
     let localizedName: String?
     let processIdentifier: pid_t?
     let secureFieldStatus: SecureFieldStatus
+    let windowTitle: String?
+    let precedingText: String?
 
     init(
         bundleIdentifier: String?,
         localizedName: String? = nil,
         processIdentifier: pid_t?,
-        secureFieldStatus: SecureFieldStatus
+        secureFieldStatus: SecureFieldStatus,
+        windowTitle: String? = nil,
+        precedingText: String? = nil
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.localizedName = localizedName
         self.processIdentifier = processIdentifier
         self.secureFieldStatus = secureFieldStatus
+        self.windowTitle = windowTitle
+        self.precedingText = precedingText
     }
 
     func identifiesSameApplication(as other: PasteTarget) -> Bool {
@@ -101,9 +107,16 @@ final class SystemAccessibilityService: AccessibilityInspecting {
             return target(for: application, secureFieldStatus: .unknown)
         }
 
+        let windowTitle = focusedWindowTitle(in: applicationElement)
+
         let subrole = stringAttribute(kAXSubroleAttribute, from: focusedElement)
         if subrole == kAXSecureTextFieldSubrole {
-            return target(for: application, secureFieldStatus: .secure)
+            return target(
+                for: application,
+                secureFieldStatus: .secure,
+                windowTitle: windowTitle,
+                precedingText: nil
+            )
         }
 
         let role = stringAttribute(kAXRoleAttribute, from: focusedElement)
@@ -111,7 +124,14 @@ final class SystemAccessibilityService: AccessibilityInspecting {
         let status: SecureFieldStatus = knownTextRoles.contains(role ?? "")
             ? .notSecure
             : .unknown
-        return target(for: application, secureFieldStatus: status)
+
+        let preceding = precedingText(from: focusedElement)
+        return target(
+            for: application,
+            secureFieldStatus: status,
+            windowTitle: windowTitle,
+            precedingText: preceding
+        )
     }
 
     func readFocusedElementText(in application: NSRunningApplication?) -> String? {
@@ -128,14 +148,80 @@ final class SystemAccessibilityService: AccessibilityInspecting {
 
     private func target(
         for application: NSRunningApplication,
-        secureFieldStatus: SecureFieldStatus
+        secureFieldStatus: SecureFieldStatus,
+        windowTitle: String? = nil,
+        precedingText: String? = nil
     ) -> PasteTarget {
         PasteTarget(
             bundleIdentifier: application.bundleIdentifier,
             localizedName: application.localizedName,
             processIdentifier: application.processIdentifier,
-            secureFieldStatus: secureFieldStatus
+            secureFieldStatus: secureFieldStatus,
+            windowTitle: windowTitle,
+            precedingText: precedingText
         )
+    }
+
+    private func focusedWindowTitle(in applicationElement: AXUIElement) -> String? {
+        var windowValue: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            applicationElement,
+            kAXFocusedWindowAttribute as CFString,
+            &windowValue
+        )
+        guard result == .success,
+              let windowValue,
+              CFGetTypeID(windowValue) == AXUIElementGetTypeID() else {
+            return nil
+        }
+        let windowElement = unsafeDowncast(windowValue, to: AXUIElement.self)
+        return stringAttribute(kAXTitleAttribute, from: windowElement)
+    }
+
+    private func precedingText(from element: AXUIElement) -> String? {
+        guard let fullText = stringAttribute(kAXValueAttribute, from: element),
+              !fullText.isEmpty else {
+            return nil
+        }
+
+        var rangeValue: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &rangeValue
+        )
+
+        guard result == .success,
+              let rangeValue,
+              CFGetTypeID(rangeValue) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        let axValue = unsafeDowncast(rangeValue, to: AXValue.self)
+        var range = CFRange()
+        guard AXValueGetValue(axValue, .cfRange, &range) else {
+            return nil
+        }
+
+        let cursorLocation = range.location
+        guard cursorLocation > 0 && cursorLocation <= fullText.utf16.count else {
+            return nil
+        }
+
+        let utf16 = fullText.utf16
+        let prefixEndIndex = utf16.index(utf16.startIndex, offsetBy: cursorLocation)
+        let prefixUtf16 = utf16[..<prefixEndIndex]
+        let prefixString = String(prefixUtf16) ?? ""
+        guard !prefixString.isEmpty else {
+            return nil
+        }
+
+        // Return up to the last 100 characters before the cursor
+        let maxChars = 100
+        if prefixString.count > maxChars {
+            return String(prefixString.suffix(maxChars))
+        }
+        return prefixString
     }
 
     private func focusedElement(in applicationElement: AXUIElement) -> AXUIElement? {

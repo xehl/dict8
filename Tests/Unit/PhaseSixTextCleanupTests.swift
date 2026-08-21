@@ -404,13 +404,19 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         let context = CleanupContext(
             targetAppName: "Cursor",
             targetBundleID: "com.todesktop.230313mzl4w4u92",
-            customVocabulary: "OpenRouter, Infisical, Jon Tuite, Abdalla"
+            customVocabulary: "OpenRouter, Infisical, Jon Tuite, Abdalla",
+            windowTitle: "TextCleanupService.swift — dict8",
+            precedingText: "let result = "
         )
         let prompt = OpenRouterTextCleanupService.buildSystemPrompt(context: context)
         XCTAssertTrue(prompt.contains("Custom vocabulary and proper nouns:"))
         XCTAssertTrue(prompt.contains("OpenRouter, Infisical, Jon Tuite, Abdalla"))
         XCTAssertTrue(prompt.contains("Target application: Cursor"))
         XCTAssertTrue(prompt.contains("code editor/terminal"))
+        XCTAssertTrue(prompt.contains("Target window/document: TextCleanupService.swift — dict8."))
+        XCTAssertTrue(prompt.contains("PRECEDING TEXT AT CURSOR:"))
+        XCTAssertTrue(prompt.contains("\"let result = \""))
+        XCTAssertTrue(prompt.contains("CONTEXTUAL INSERTION RULE:"))
 
         // Verify that custom vocabulary words are recognized
         let validator = CleanupOutputValidator()

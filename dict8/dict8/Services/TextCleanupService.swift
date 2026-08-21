@@ -80,15 +80,21 @@ nonisolated struct CleanupContext: Equatable, Sendable {
     let targetAppName: String?
     let targetBundleID: String?
     let customVocabulary: String
+    let windowTitle: String?
+    let precedingText: String?
 
     init(
         targetAppName: String? = nil,
         targetBundleID: String? = nil,
-        customVocabulary: String = ""
+        customVocabulary: String = "",
+        windowTitle: String? = nil,
+        precedingText: String? = nil
     ) {
         self.targetAppName = targetAppName
         self.targetBundleID = targetBundleID
         self.customVocabulary = customVocabulary
+        self.windowTitle = windowTitle
+        self.precedingText = precedingText
     }
 
     static let empty = CleanupContext()
@@ -467,6 +473,24 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             } else {
                 prompt += "\n\nTarget application: \(appName)."
             }
+        }
+
+        if let windowTitle = context.windowTitle, !windowTitle.isEmpty {
+            prompt += "\nTarget window/document: \(windowTitle)."
+        }
+
+        if let preceding = context.precedingText, !preceding.isEmpty {
+            prompt += """
+
+
+            PRECEDING TEXT AT CURSOR:
+            "\(preceding)"
+
+            CONTEXTUAL INSERTION RULE:
+            The dictated speech is being inserted immediately after the preceding text above.
+            - If the preceding text ends mid-sentence (e.g. after a comma, conjunction, or lowercase word without ending punctuation), do NOT capitalize the first word of the dictation unless it is a proper noun or 'I'.
+            - If the dictation is completing an unfinished sentence or clause, match the surrounding flow naturally.
+            """
         }
 
         return prompt
