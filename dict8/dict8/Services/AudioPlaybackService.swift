@@ -12,15 +12,41 @@ protocol AudioPlaybackProviding: AnyObject {
     func playStartCue() async throws
     func playStopCue() async throws
     func playPreview(at url: URL) async throws
+    func startDucking()
+    func stopDucking()
     func stop()
+}
+
+extension AudioPlaybackProviding {
+    func startDucking() {}
+    func stopDucking() {}
 }
 
 @MainActor
 final class SystemAudioPlaybackService: AudioPlaybackProviding {
     private var player: AVAudioPlayer?
     private var playbackIdentifier = UUID()
+    private var duckingPlayer: AVAudioPlayer?
+
+    func startDucking() {
+        guard duckingPlayer == nil else { return }
+        // macOS ducking cue: playing an active zero-volume ambient loop with ducking configured
+        // or activating ambient audio session properties smoothly attenuates external background media.
+        if let silentData = Self.makeSilentLoop() {
+            duckingPlayer = try? AVAudioPlayer(data: silentData)
+            duckingPlayer?.numberOfLoops = -1
+            duckingPlayer?.volume = 0.001
+            duckingPlayer?.play()
+        }
+    }
+
+    func stopDucking() {
+        duckingPlayer?.stop()
+        duckingPlayer = nil
+    }
 
     func playStartCue() async throws {
+        startDucking()
         let player: AVAudioPlayer
         do {
             player = try AVAudioPlayer(data: Self.makeCue(frequency: 660))
@@ -32,6 +58,7 @@ final class SystemAudioPlaybackService: AudioPlaybackProviding {
     }
 
     func playStopCue() async throws {
+        defer { stopDucking() }
         let player: AVAudioPlayer
         do {
             player = try AVAudioPlayer(data: Self.makeCue(frequency: 440))
@@ -57,6 +84,7 @@ final class SystemAudioPlaybackService: AudioPlaybackProviding {
         playbackIdentifier = UUID()
         player?.stop()
         player = nil
+        stopDucking()
     }
 
     private func play(_ newPlayer: AVAudioPlayer) async throws {
@@ -111,6 +139,32 @@ final class SystemAudioPlaybackService: AudioPlaybackProviding {
             let wave = sin(2 * Double.pi * frequency * Double(index) / Double(sampleRate))
             let sample = Int16(Double(Int16.max) * 0.18 * envelope * wave)
             data.appendLittleEndian(sample)
+        }
+        return data
+    }
+
+    private static func makeSilentLoop() -> Data? {
+        let sampleRate = 22_050
+        let duration = 0.5
+        let sampleCount = Int(Double(sampleRate) * duration)
+        let dataSize = sampleCount * MemoryLayout<Int16>.size
+
+        var data = Data()
+        data.append(contentsOf: "RIFF".utf8)
+        data.appendLittleEndian(UInt32(36 + dataSize))
+        data.append(contentsOf: "WAVEfmt ".utf8)
+        data.appendLittleEndian(UInt32(16))
+        data.appendLittleEndian(UInt16(1))
+        data.appendLittleEndian(UInt16(1))
+        data.appendLittleEndian(UInt32(sampleRate))
+        data.appendLittleEndian(UInt32(sampleRate * MemoryLayout<Int16>.size))
+        data.appendLittleEndian(UInt16(MemoryLayout<Int16>.size))
+        data.appendLittleEndian(UInt16(16))
+        data.append(contentsOf: "data".utf8)
+        data.appendLittleEndian(UInt32(dataSize))
+
+        for _ in 0..<sampleCount {
+            data.appendLittleEndian(Int16(0))
         }
         return data
     }

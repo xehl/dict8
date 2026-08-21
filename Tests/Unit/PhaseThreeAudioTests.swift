@@ -247,6 +247,7 @@ final class PhaseThreeAudioTests: XCTestCase {
         await fulfillment(of: [recordingStarted], timeout: 1)
         monitor.onPushToTalkReleased?()
 
+        XCTAssertTrue(eventLog.events.contains("record prewarm"))
         XCTAssertEqual(eventLog.events.filter { $0 == "record start" }.count, 1)
         XCTAssertEqual(eventLog.events.filter { $0 == "record stop" }.count, 1)
         XCTAssertFalse(state.audioTestStatus.hasRecordingReady)
@@ -516,6 +517,10 @@ private final class FakeAudioRecorder: AudioRecording {
     func start() throws {
         eventLog.append("record start")
         isRecording = true
+    }
+
+    func prewarm() {
+        eventLog.append("record prewarm")
     }
 
     func stop() throws -> RecordedAudioFile {

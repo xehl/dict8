@@ -109,10 +109,15 @@ protocol AudioRecording: AnyObject {
         get set
     }
 
+    func prewarm()
     func start() throws
     func stop() throws -> RecordedAudioFile
     func cancel() throws
     func delete(_ recording: RecordedAudioFile) throws
+}
+
+extension AudioRecording {
+    func prewarm() {}
 }
 
 @MainActor
@@ -148,6 +153,12 @@ final class SystemAudioRecordingService: AudioRecording {
         let driver: any AudioRecorderDriving
     }
 
+    private struct PrewarmedRecorder {
+        let identifier: UUID
+        let url: URL
+        let driver: any AudioRecorderDriving
+    }
+
     var onMaximumDurationReached: ((Result<RecordedAudioFile, AudioRecordingError>) -> Void)?
 
     private let fileManager: FileManager
@@ -155,6 +166,7 @@ final class SystemAudioRecordingService: AudioRecording {
     private let permissionStatus: () -> MicrophonePermissionStatus
     private let recorderFactory: RecorderFactory
     private var activeRecording: ActiveRecording?
+    private var prewarmedRecorder: PrewarmedRecorder?
 
     init(
         fileManager: FileManager = .default,
@@ -170,6 +182,30 @@ final class SystemAudioRecordingService: AudioRecording {
         self.temporaryRoot = temporaryRoot ?? fileManager.temporaryDirectory
         self.permissionStatus = permissionStatus
         self.recorderFactory = recorderFactory
+    }
+
+    func prewarm() {
+        guard permissionStatus() == .granted, activeRecording == nil, prewarmedRecorder == nil else {
+            return
+        }
+        let directory = temporaryRoot.appending(
+            component: "dict8-recordings",
+            directoryHint: .isDirectory
+        )
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory
+            .appending(component: UUID().uuidString)
+            .appendingPathExtension("m4a")
+        guard let driver = try? recorderFactory(url, Self.settings),
+              driver.prepareToRecord() else {
+            try? removeIfPresent(url)
+            return
+        }
+        prewarmedRecorder = PrewarmedRecorder(
+            identifier: UUID(),
+            url: url,
+            driver: driver
+        )
     }
 
     var isRecording: Bool {
@@ -188,37 +224,50 @@ final class SystemAudioRecordingService: AudioRecording {
             throw AudioRecordingError.alreadyRecording
         }
 
-        let directory = temporaryRoot.appending(
-            component: "dict8-recordings",
-            directoryHint: .isDirectory
-        )
-        do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
-        } catch {
-            throw AudioRecordingError.temporaryDirectoryCreationFailed
-        }
-
-        let url = directory
-            .appending(component: UUID().uuidString)
-            .appendingPathExtension("m4a")
+        let identifier: UUID
+        let url: URL
         let driver: any AudioRecorderDriving
-        do {
-            driver = try recorderFactory(url, Self.settings)
-        } catch {
-            try removeIfPresent(url)
-            throw AudioRecordingError.recorderCreationFailed
+
+        if let prewarmed = prewarmedRecorder {
+            prewarmedRecorder = nil
+            identifier = prewarmed.identifier
+            url = prewarmed.url
+            driver = prewarmed.driver
+        } else {
+            let directory = temporaryRoot.appending(
+                component: "dict8-recordings",
+                directoryHint: .isDirectory
+            )
+            do {
+                try fileManager.createDirectory(
+                    at: directory,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                throw AudioRecordingError.temporaryDirectoryCreationFailed
+            }
+
+            url = directory
+                .appending(component: UUID().uuidString)
+                .appendingPathExtension("m4a")
+            do {
+                driver = try recorderFactory(url, Self.settings)
+            } catch {
+                try removeIfPresent(url)
+                throw AudioRecordingError.recorderCreationFailed
+            }
+            identifier = UUID()
+            guard driver.prepareToRecord() else {
+                try removeIfPresent(url)
+                throw AudioRecordingError.recordingStartFailed
+            }
         }
 
-        let identifier = UUID()
         driver.onFinished = { [weak self] succeeded in
             self?.handleAutomaticFinish(identifier: identifier, succeeded: succeeded)
         }
 
-        guard driver.prepareToRecord(),
-              driver.record(forDuration: Self.maximumDuration) else {
+        guard driver.record(forDuration: Self.maximumDuration) else {
             driver.onFinished = nil
             driver.stop()
             try removeIfPresent(url)
@@ -251,6 +300,11 @@ final class SystemAudioRecordingService: AudioRecording {
     }
 
     func cancel() throws {
+        if let prewarmed = prewarmedRecorder {
+            prewarmedRecorder = nil
+            prewarmed.driver.stop()
+            try? removeIfPresent(prewarmed.url)
+        }
         guard let activeRecording else { return }
         self.activeRecording = nil
         activeRecording.driver.onFinished = nil

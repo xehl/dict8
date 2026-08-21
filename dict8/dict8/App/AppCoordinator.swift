@@ -358,6 +358,7 @@ final class AppCoordinator {
             hud.showFeedback(.secureFieldRefused)
             return
         }
+        audioRecorder.prewarm()
         startTestRecording(originatingTarget: target)
     }
 
