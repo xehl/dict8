@@ -1210,8 +1210,9 @@ final class AppCoordinator {
         spotCorrectionTask?.cancel()
         spotCorrectionTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            // Observe focused element text after 3 seconds and 6 seconds
-            for delay in [3, 3] {
+            // Observe focused element text across a generous 10-second window (at 2s, 4s, 7s, 10s)
+            let delays = [2, 2, 3, 3]
+            for delay in delays {
                 try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000)
                 if Task.isCancelled { return }
 

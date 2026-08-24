@@ -143,7 +143,23 @@ final class SystemAccessibilityService: AccessibilityInspecting {
         guard let focusedElement = focusedElement(in: applicationElement) else {
             return nil
         }
-        return stringAttribute(kAXValueAttribute, from: focusedElement)
+
+        // 1. Try direct value attribute (standard native text fields, WebViews)
+        if let value = stringAttribute(kAXValueAttribute, from: focusedElement), !value.isEmpty {
+            return value
+        }
+
+        // 2. Try selected text if highlighted
+        if let selected = stringAttribute(kAXSelectedTextAttribute, from: focusedElement), !selected.isEmpty {
+            return selected
+        }
+
+        // 3. Try description / title for certain editable custom views
+        if let title = stringAttribute(kAXTitleAttribute, from: focusedElement), !title.isEmpty {
+            return title
+        }
+
+        return nil
     }
 
     private func target(

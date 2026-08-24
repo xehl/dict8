@@ -18,35 +18,79 @@ nonisolated struct SpotCorrectionDiffEngine: Sendable {
         guard !pastedWords.isEmpty, !editedWords.isEmpty else { return nil }
         guard pastedWords != editedWords else { return nil }
 
-        // Find single-word substitutions
-        var candidatePairs: [(original: String, corrected: String)] = []
-
-        // If the word count is identical, compare index by index
+        // 1. Direct same-length substitution check
         if pastedWords.count == editedWords.count {
+            var diffs: [(original: String, corrected: String)] = []
             for (p, e) in zip(pastedWords, editedWords) {
-                if p != e {
-                    candidatePairs.append((p, e))
+                if cleanWord(p) != cleanWord(e) {
+                    diffs.append((p, e))
                 }
             }
-        } else {
-            // Check if editedText is a substring or container of the edited region
-            // Simple alignment: find words in pastedText missing from editedText and vice versa
-            let diffPasted = pastedWords.filter { !editedWords.contains($0) }
-            let diffEdited = editedWords.filter { !pastedWords.contains($0) }
-
-            if diffPasted.count == 1, diffEdited.count == 1,
-               let orig = diffPasted.first, let corr = diffEdited.first {
-                candidatePairs.append((orig, corr))
+            if diffs.count == 1, let (orig, corr) = diffs.first {
+                return validatePair(original: orig, corrected: corr)
             }
         }
 
-        // We only learn when exactly one word was corrected
-        guard candidatePairs.count == 1,
-              let (original, corrected) = candidatePairs.first else {
-            return nil
+        // 2. Sliding window sub-slice check:
+        // When editedText contains the full pastedText (plus or minus surrounding buffer words)
+        // Check windows of size pastedWords.count in editedWords
+        let pLen = pastedWords.count
+        if editedWords.count >= pLen {
+            for start in 0...(editedWords.count - pLen) {
+                let window = Array(editedWords[start..<(start + pLen)])
+                var diffs: [(original: String, corrected: String)] = []
+                for (p, e) in zip(pastedWords, window) {
+                    if cleanWord(p) != cleanWord(e) {
+                        diffs.append((p, e))
+                    }
+                }
+                if diffs.count == 1, let (orig, corr) = diffs.first {
+                    if let pair = validatePair(original: orig, corrected: corr) {
+                        return pair
+                    }
+                }
+            }
         }
 
-        // Clean punctuation from candidate words
+        // 3. Multi-word phrase substitution (e.g. 2-to-1: "in physical" -> "Infisical" or "open router" -> "OpenRouter")
+        if editedWords.count >= (pLen - 1) && pLen >= 2 {
+            for start in 0...(editedWords.count - (pLen - 1)) {
+                let window = Array(editedWords[start..<(start + pLen - 1)])
+                // Find where the 2 words merged into 1
+                for splitIdx in 0..<(pLen - 1) {
+                    let pBefore = Array(pastedWords[0..<splitIdx])
+                    let pPair = Array(pastedWords[splitIdx..<(splitIdx + 2)])
+                    let pAfter = Array(pastedWords[(splitIdx + 2)..<pLen])
+
+                    let wBefore = Array(window[0..<splitIdx])
+                    let wCandidate = window[splitIdx]
+                    let wAfter = Array(window[(splitIdx + 1)..<window.count])
+
+                    if pBefore.map(cleanWord) == wBefore.map(cleanWord) &&
+                       pAfter.map(cleanWord) == wAfter.map(cleanWord) {
+                        let combinedOrig = pPair.joined(separator: " ")
+                        let cleanCorr = cleanWord(wCandidate)
+                        let cleanOrigNoSpace = cleanWord(pPair.joined())
+                        if levenshteinDistance(cleanOrigNoSpace.lowercased(), cleanCorr.lowercased()) <= 3 {
+                            return SpotCorrectionPair(originalWord: combinedOrig, correctedWord: cleanCorr)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback set difference for loose cursor placement
+        let diffPasted = pastedWords.filter { p in !editedWords.contains(where: { cleanWord($0).lowercased() == cleanWord(p).lowercased() }) }
+        let diffEdited = editedWords.filter { e in !pastedWords.contains(where: { cleanWord($0).lowercased() == cleanWord(e).lowercased() }) }
+
+        if diffPasted.count == 1 && diffEdited.count == 1 {
+            return validatePair(original: diffPasted[0], corrected: diffEdited[0])
+        }
+
+        return nil
+    }
+
+    private func validatePair(original: String, corrected: String) -> SpotCorrectionPair? {
         let cleanOrig = cleanWord(original)
         let cleanCorr = cleanWord(corrected)
 
@@ -55,15 +99,12 @@ nonisolated struct SpotCorrectionDiffEngine: Sendable {
             return nil
         }
 
-        // Check edit distance heuristic
         let distance = levenshteinDistance(cleanOrig.lowercased(), cleanCorr.lowercased())
         let maxAllowedDistance = cleanOrig.count <= 6 ? 2 : 3
 
-        // Case difference (e.g. devin -> Devin) is distance 0 in lowercase, which is a valid capitalization correction
         if distance <= maxAllowedDistance {
             return SpotCorrectionPair(originalWord: cleanOrig, correctedWord: cleanCorr)
         }
-
         return nil
     }
 

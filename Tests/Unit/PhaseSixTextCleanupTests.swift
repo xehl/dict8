@@ -230,6 +230,22 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertEqual(fix1?.originalWord, "Devon")
         XCTAssertEqual(fix1?.correctedWord, "Devin")
 
+        // Correction inside a larger existing text buffer (preceding and trailing buffer context)
+        let bufferFix = engine.findCorrection(
+            pastedText: "talked with Devon yesterday",
+            editedText: "Hey team, I talked with Devin yesterday about the release."
+        )
+        XCTAssertEqual(bufferFix?.originalWord, "Devon")
+        XCTAssertEqual(bufferFix?.correctedWord, "Devin")
+
+        // 2-to-1 multi-word phonetic correction ("in physical" -> "Infisical")
+        let multiFix = engine.findCorrection(
+            pastedText: "we deployed to in physical yesterday",
+            editedText: "we deployed to Infisical yesterday"
+        )
+        XCTAssertEqual(multiFix?.originalWord, "in physical")
+        XCTAssertEqual(multiFix?.correctedWord, "Infisical")
+
         // Capitalization correction (infisical -> Infisical)
         let fix2 = engine.findCorrection(
             pastedText: "we deployed to infisical yesterday",
