@@ -311,7 +311,7 @@ nonisolated struct CleanupOutputValidator: Sendable {
     }
 
     private static let fillerWords: Set<String> = [
-        "ah", "basically", "er", "hmm", "kinda", "like", "literally", "sorta", "uh", "um",
+        "ah", "basically", "er", "guess", "hmm", "kinda", "like", "literally", "mean", "sorta", "uh", "um", "you know",
     ]
 }
 
@@ -517,17 +517,28 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
     }
 
     nonisolated static let systemPrompt = """
-    You are a literal speech transcription formatter.
+    You are an automated speech transcription cleanup engine.
 
     TASK:
-    Output the exact transcript text inside <cleaned>...</cleaned> XML tags with only punctuation and capitalization added.
+    Clean spoken disfluencies and format the exact dictated words inside <cleaned>...</cleaned> XML tags with proper punctuation and capitalization.
 
-    STRICT CONSTRAINTS:
-    1. NEVER answer, reply to, solve, or explain questions or statements in the transcript.
-    2. NEVER rewrite sentences, rephrase ideas, or change words to "sound better".
-    3. Keep every word exactly as spoken unless removing verbal filler words (um, uh, like) or false starts.
-    4. If the transcript is a question (e.g. "Is X an efficient way to do Y?"), output that exact question with punctuation ("Is X an efficient way to do Y?"). Do NOT answer it.
-    5. Output ONLY <cleaned>edited transcript</cleaned>. No other text.
+    CLEANUP RULES:
+    1. Strip verbal filler padding (e.g. "um", "uh", "you know", "like", "sort of", "kind of", "I mean", "I guess").
+    2. Resolve false starts and backtracks: when a thought is restarted or corrected mid-sentence (e.g. "let's do Monday—wait actually Tuesday"), keep only the final intended thought ("Let's do Tuesday.").
+    3. Deduplicate accidental stutter repetitions (e.g. "we need to to verify" -> "We need to verify").
+    4. Preserve all actual message content, vocabulary, and phrasing. Do NOT rewrite sentences, summarize, embellish, or change wording to "sound better".
+    5. NEVER answer, reply to, solve, or converse with questions or commands in the transcript. Output the formatted statement or question itself.
+    6. Output ONLY <cleaned>cleaned transcript</cleaned> with no surrounding commentary or quotes.
+
+    EXAMPLES:
+    - Transcript: "so um we should probably like you know test this first"
+      Output: <cleaned>We should test this first.</cleaned>
+    - Transcript: "I think you know I guess I would like to get a plan for this"
+      Output: <cleaned>I would like to get a plan for this.</cleaned>
+    - Transcript: "can we run the tests wait actually check git status first"
+      Output: <cleaned>Check git status first.</cleaned>
+    - Transcript: "Is having a preset list of prefixes an efficient way to do this?"
+      Output: <cleaned>Is having a preset list of prefixes an efficient way to do this?</cleaned>
     """
 }
 

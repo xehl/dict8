@@ -288,6 +288,19 @@ final class PhaseSixTextCleanupTests: XCTestCase {
             against: "the first thing i wanted to say no actually let me restart the main issue is that the export finishes but the notification never appears"
         )
         XCTAssertTrue(restarted.hasPrefix("The main issue"))
+
+        // Disfluency padding and stutters
+        let disfluent = try validator.validate(
+            output: "I would like to get a plan for this.",
+            against: "I think you know I guess I would like to get a plan for this"
+        )
+        XCTAssertEqual(disfluent, "I would like to get a plan for this.")
+
+        let stutter = try validator.validate(
+            output: "We need to verify the deployment.",
+            against: "we we need to to verify the the deployment"
+        )
+        XCTAssertEqual(stutter, "We need to verify the deployment.")
     }
 
     func testValidatorRejectsFencesWrappersAndExpansion() throws {
