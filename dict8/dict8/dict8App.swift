@@ -66,5 +66,6 @@ struct Dict8App: App {
             SettingsView(coordinator: coordinator)
                 .environmentObject(appState)
         }
+        .windowResizability(.contentSize)
     }
 }

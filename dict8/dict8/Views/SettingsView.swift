@@ -42,20 +42,14 @@ struct SettingsView: View {
                 latencySection
                 costSection
                 lastIssueSection
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-            .frame(width: 375, height: columnHeight, alignment: .top)
-
-            Form {
-                perModelMetricsSection
+                recentDiagnosticsSection
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
             .frame(width: 375, height: columnHeight, alignment: .top)
             .padding(.trailing, 16)
         }
-        .frame(width: 1485, height: columnHeight)
+        .frame(width: 1096, height: columnHeight)
         .sheet(isPresented: $isCustomVocabularySheetPresented) {
             CustomVocabularySheetView(
                 vocabularyDraft: $vocabularyDraft,
@@ -244,15 +238,14 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Picker("Cleanup Candidate", selection: Binding(
-                get: { appState.selectedCleanupModel },
-                set: { coordinator.setSelectedCleanupModel($0) }
-            )) {
-                ForEach(AIModelConfiguration.fastCleanupCandidates, id: \.self) { candidate in
-                    Text(candidate).tag(candidate)
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Cleanup Model")
+                Text(models.cleanupModel)
+                    .font(.body)
+                Text("Remote Nitro Inference (sub-500ms)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.menu)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -596,47 +589,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var perModelMetricsSection: some View {
-        Section("Per-Model Cleanup") {
-            let cleanupMetrics = appState.usageMetrics.cleanupModelMetrics
-            let activeCandidates = Set(AIModelConfiguration.fastCleanupCandidates)
-            let displayModels = Array(cleanupMetrics.keys.filter { activeCandidates.contains($0) }.sorted())
-            if displayModels.isEmpty {
-                Text("No metrics for active cleanup candidates yet.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(displayModels, id: \.self) { model in
-                    if let stats = cleanupMetrics[model] {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(model)
-                                .font(.subheadline.bold())
-                            HStack(spacing: 8) {
-                                Text("\(formatStatSeconds(stats.averageLatencySeconds)) avg")
-                                Text("·")
-                                Text("\(formatStatSeconds(stats.p50LatencySeconds)) p50")
-                                Text("·")
-                                Text("\(formatStatSeconds(stats.p95LatencySeconds)) p95")
-                            }
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-
-                            HStack {
-                                if let wps = stats.wordsPerSecond {
-                                    Text("\(wps.formatted(.number.precision(.fractionLength(0)))) wps")
-                                    Text("·")
-                                }
-                                Text("\(stats.count) req · \(formattedCost(stats.totalCost))")
-                            }
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-            }
-        }
-
+    private var recentDiagnosticsSection: some View {
         Section("Recent Dictation Diagnostics") {
             let diagnostics = appState.cleanupDiagnostics
             if diagnostics.isEmpty {
