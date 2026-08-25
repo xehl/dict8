@@ -429,10 +429,25 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         XCTAssertTrue(prompt.contains("OpenRouter, Infisical, Jon Tuite, Abdalla"))
         XCTAssertTrue(prompt.contains("Target application: Cursor"))
         XCTAssertTrue(prompt.contains("code editor/terminal"))
-        XCTAssertTrue(prompt.contains("Target window/document: TextCleanupService.swift — dict8."))
-        XCTAssertTrue(prompt.contains("PRECEDING TEXT AT CURSOR:"))
-        XCTAssertTrue(prompt.contains("\"let result = \""))
-        XCTAssertTrue(prompt.contains("CONTEXTUAL INSERTION RULE:"))
+
+        let transport = CleanupTransportStub(
+            result: .success(
+                response(
+                    text: "<cleaned>I used Infisical with OpenRouter yesterday on macOS.</cleaned>"
+                )
+            )
+        )
+        let service = makeService(transport: transport)
+        _ = try await service.clean("I used in physical with open router yesterday on macOS", context: context)
+        let executions = await transport.executions()
+        let execution = try XCTUnwrap(executions.first)
+        let body = try jsonObject(execution.request.body)
+        let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+        let userContent = try XCTUnwrap(messages[1]["content"] as? String)
+        XCTAssertTrue(userContent.contains("Target window/document: TextCleanupService.swift — dict8."))
+        XCTAssertTrue(userContent.contains("PRECEDING TEXT AT CURSOR:"))
+        XCTAssertTrue(userContent.contains("\"let result = \""))
+        XCTAssertTrue(userContent.contains("CONTEXTUAL INSERTION RULE:"))
 
         // Verify that custom vocabulary words are recognized
         let validator = CleanupOutputValidator()

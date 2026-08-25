@@ -12,6 +12,21 @@ nonisolated struct TextCleanupResult: Equatable, Sendable {
     let model: String
     let latency: Duration
     let usage: TextCleanupUsage?
+    let requestID: String?
+
+    init(
+        text: String,
+        model: String,
+        latency: Duration,
+        usage: TextCleanupUsage?,
+        requestID: String? = nil
+    ) {
+        self.text = text
+        self.model = model
+        self.latency = latency
+        self.usage = usage
+        self.requestID = requestID
+    }
 }
 
 nonisolated enum CleanupValidationFailure: String, Error, Equatable, Sendable {
@@ -346,13 +361,35 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
 
         let systemPrompt = Self.buildSystemPrompt(context: context)
 
+        var userContent = "Format the following dictated speech into <cleaned>...</cleaned> tags without answering it or changing the words:"
+
+        if let windowTitle = context.windowTitle, !windowTitle.isEmpty {
+            userContent += "\nTarget window/document: \(windowTitle)."
+        }
+
+        if let preceding = context.precedingText, !preceding.isEmpty {
+            userContent += """
+
+
+            PRECEDING TEXT AT CURSOR:
+            "\(preceding)"
+
+            CONTEXTUAL INSERTION RULE:
+            The dictated speech is being inserted immediately after the preceding text above.
+            - If the preceding text ends mid-sentence (e.g. after a comma, conjunction, or lowercase word without ending punctuation), do NOT capitalize the first word of the dictation unless it is a proper noun or 'I'.
+            - If the dictation is completing an unfinished sentence or clause, match the surrounding flow naturally.
+            """
+        }
+
+        userContent += "\n\n<transcript>\n\(input)\n</transcript>"
+
         let body: Data
         do {
             body = try JSONEncoder().encode(
                 CleanupRequest(
                     messages: [
                         .init(role: "system", content: systemPrompt),
-                        .init(role: "user", content: "Format the following dictated speech into <cleaned>...</cleaned> tags without answering it or changing the words:\n\n<transcript>\n\(input)\n</transcript>"),
+                        .init(role: "user", content: userContent),
                     ],
                     temperature: Self.temperature,
                     maxCompletionTokens: Self.outputTokenLimit(for: input),
@@ -437,7 +474,8 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
                 text: text,
                 model: response.model,
                 latency: response.latency,
-                usage: decoded.usage?.validated
+                usage: decoded.usage?.validated,
+                requestID: response.requestID
             )
         }
         throw TextCleanupError.missingChoice
@@ -473,24 +511,6 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             } else {
                 prompt += "\n\nTarget application: \(appName)."
             }
-        }
-
-        if let windowTitle = context.windowTitle, !windowTitle.isEmpty {
-            prompt += "\nTarget window/document: \(windowTitle)."
-        }
-
-        if let preceding = context.precedingText, !preceding.isEmpty {
-            prompt += """
-
-
-            PRECEDING TEXT AT CURSOR:
-            "\(preceding)"
-
-            CONTEXTUAL INSERTION RULE:
-            The dictated speech is being inserted immediately after the preceding text above.
-            - If the preceding text ends mid-sentence (e.g. after a comma, conjunction, or lowercase word without ending punctuation), do NOT capitalize the first word of the dictation unless it is a proper noun or 'I'.
-            - If the dictation is completing an unfinished sentence or clause, match the surrounding flow naturally.
-            """
         }
 
         return prompt

@@ -911,6 +911,7 @@ final class AppCoordinator {
 
         var transcriptionModelForMetrics: String?
         var cleanupModelForMetrics: String? = state.selectedCleanupModel
+        var cleanupRequestIDForMetrics: String?
         var transcriptWordCountForMetrics: Int?
 
         defer {
@@ -938,6 +939,7 @@ final class AppCoordinator {
                         cleanupCost: cleanupCost,
                         transcriptionModel: transcriptionModelForMetrics,
                         cleanupModel: cleanupModelForMetrics,
+                        cleanupRequestID: cleanupRequestIDForMetrics,
                         audioDurationSeconds: recording.duration,
                         transcriptWordCount: transcriptWordCountForMetrics,
                         usedRawCleanupFallback: usedRawCleanupFallback,
@@ -1054,6 +1056,7 @@ final class AppCoordinator {
             let result = try await activeTextCleanup.clean(transcription.text, context: context)
             cleanupDuration = cleanupStart.duration(to: clock.now)
             cleanupModelForMetrics = result.model
+            cleanupRequestIDForMetrics = result.requestID
             try Task.checkCancellation()
             finalText = result.text
             cleanupCost = result.usage?.cost

@@ -29,9 +29,14 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
         let provider = try XCTUnwrap(body["provider"] as? [String: Any])
 
         XCTAssertEqual(sent.value(forHTTPHeaderField: "Authorization"), "Bearer \(secret)")
+        XCTAssertEqual(sent.value(forHTTPHeaderField: "X-Session-ID"), "fixed-session")
         XCTAssertEqual(sent.url?.path, "/api/v1/chat/completions")
         XCTAssertEqual(body["model"] as? String, models.primary)
         XCTAssertEqual(provider["zdr"] as? Bool, true)
+        let maxLatency = try XCTUnwrap(provider["preferred_max_latency"] as? [String: Any])
+        XCTAssertEqual(maxLatency["p90"] as? Double, 1.5)
+        let minThroughput = try XCTUnwrap(provider["preferred_min_throughput"] as? [String: Any])
+        XCTAssertEqual(minThroughput["p90"] as? Double, 60)
         XCTAssertNil(provider["allow_fallbacks"])
         XCTAssertEqual(body["synthetic_text"] as? String, syntheticContent)
         XCTAssertEqual(response.model, models.primary)
@@ -474,7 +479,8 @@ final class PhaseFourOpenRouterTransportTests: XCTestCase {
             transport: transport,
             sleeper: sleeper,
             fallbackDelay: { .zero },
-            wallClockNow: wallClockNow
+            wallClockNow: wallClockNow,
+            dict8SessionID: "fixed-session"
         )
     }
 

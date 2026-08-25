@@ -26,6 +26,21 @@ nonisolated struct OpenRouterResponse: Sendable {
     let model: String
     let attemptNumber: Int
     let latency: Duration
+    let requestID: String?
+
+    init(
+        data: Data,
+        model: String,
+        attemptNumber: Int,
+        latency: Duration,
+        requestID: String? = nil
+    ) {
+        self.data = data
+        self.model = model
+        self.attemptNumber = attemptNumber
+        self.latency = latency
+        self.requestID = requestID
+    }
 
     nonisolated var usedFallback: Bool { attemptNumber == 2 }
 }
@@ -148,6 +163,7 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
     private let sleeper: any OpenRouterSleeping
     private let fallbackDelay: @Sendable () -> Duration
     private let wallClockNow: @Sendable () -> Date
+    private let dict8SessionID: String
 
     init(
         baseURL: URL? = URL(string: "https://openrouter.ai/api/v1/"),
@@ -157,7 +173,8 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         fallbackDelay: @escaping @Sendable () -> Duration = {
             .milliseconds(150 + Int.random(in: 0 ... 100))
         },
-        wallClockNow: @escaping @Sendable () -> Date = Date.init
+        wallClockNow: @escaping @Sendable () -> Date = Date.init,
+        dict8SessionID: String = "dict8-\(UUID().uuidString.prefix(8))"
     ) {
         self.baseURL = baseURL
         self.apiKeyStore = apiKeyStore
@@ -165,6 +182,7 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         self.sleeper = sleeper
         self.fallbackDelay = fallbackDelay
         self.wallClockNow = wallClockNow
+        self.dict8SessionID = dict8SessionID
     }
 
     func execute(
@@ -202,11 +220,13 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
                 guard (200 ... 299).contains(result.response.statusCode) else {
                     throw classifiedFailure(from: result)
                 }
+                let requestID = result.response.value(forHTTPHeaderField: "x-openrouter-request-id")
                 return OpenRouterResponse(
                     data: result.data,
                     model: model,
                     attemptNumber: index + 1,
-                    latency: executionStartedAt.duration(to: clock.now)
+                    latency: executionStartedAt.duration(to: clock.now),
+                    requestID: requestID
                 )
             } catch let failure as AttemptFailure {
                 guard index == 0, failure.fallbackEligible else {
@@ -293,11 +313,13 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
                 }
                 throw failure.error
             }
+            let requestID = result.response.value(forHTTPHeaderField: "x-openrouter-request-id")
             return OpenRouterResponse(
                 data: result.data,
                 model: model,
                 attemptNumber: 1,
-                latency: executionStartedAt.duration(to: clock.now)
+                latency: executionStartedAt.duration(to: clock.now),
+                requestID: requestID
             )
         } catch is CancellationError {
             throw OpenRouterClientError.cancelled
@@ -342,6 +364,12 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
                 throw OpenRouterClientError.invalidRequest
             }
             provider["zdr"] = true
+            if provider["preferred_max_latency"] == nil {
+                provider["preferred_max_latency"] = ["p90": 1.5]
+            }
+            if provider["preferred_min_throughput"] == nil {
+                provider["preferred_min_throughput"] = ["p90": 60]
+            }
             body["provider"] = provider
         }
         body["model"] = model
@@ -377,6 +405,7 @@ final class OpenRouterClient: OpenRouterTransporting, Sendable {
         // X-OpenRouter-Title sets the display name and must be paired with it.
         urlRequest.setValue("https://github.com/xehl/dict8", forHTTPHeaderField: "HTTP-Referer")
         urlRequest.setValue("dict8", forHTTPHeaderField: "X-OpenRouter-Title")
+        urlRequest.setValue(dict8SessionID, forHTTPHeaderField: "X-Session-ID")
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         return urlRequest
     }

@@ -19,6 +19,7 @@ nonisolated struct AIModelConfiguration: Equatable, Sendable {
     /// Fast cloud candidate models evaluated during benchmarking harness experimentation.
     static let fastCleanupCandidates: [String] = [
         "meta-llama/llama-3.1-8b-instruct:nitro",
+        "google/gemini-2.5-flash-lite",
         "meta-llama/llama-3.2-3b-instruct",
         "qwen/qwen-2.5-7b-instruct",
         "openrouter/auto",

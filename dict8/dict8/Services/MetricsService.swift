@@ -209,6 +209,7 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
     let cleanupCost: Double?
     let transcriptionModel: String?
     let cleanupModel: String?
+    let cleanupRequestID: String?
     let audioDurationSeconds: Double?
     let transcriptWordCount: Int?
     let usedRawCleanupFallback: Bool
@@ -224,6 +225,7 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
         cleanupCost: Double?,
         transcriptionModel: String? = nil,
         cleanupModel: String? = nil,
+        cleanupRequestID: String? = nil,
         audioDurationSeconds: Double? = nil,
         transcriptWordCount: Int? = nil,
         usedRawCleanupFallback: Bool,
@@ -238,6 +240,7 @@ nonisolated struct DictationMetricEvent: Equatable, Sendable {
         self.cleanupCost = cleanupCost
         self.transcriptionModel = transcriptionModel
         self.cleanupModel = cleanupModel
+        self.cleanupRequestID = cleanupRequestID
         self.audioDurationSeconds = audioDurationSeconds
         self.transcriptWordCount = transcriptWordCount
         self.usedRawCleanupFallback = usedRawCleanupFallback
@@ -607,6 +610,8 @@ nonisolated enum DictationTelemetryLogger {
         let latencyMs: Double
         let costUsd: Double
         let wordCount: Int
+        let wordsPerSecond: Double?
+        let requestId: String?
         let usedFallback: Bool
     }
 
@@ -622,7 +627,11 @@ nonisolated enum DictationTelemetryLogger {
             var records: [Record] = []
 
             if let model = event.cleanupModel, !model.isEmpty {
-                let latencyMs = event.cleanupLatency.map { Double($0.components.seconds) * 1000.0 + Double($0.components.attoseconds) / 1_000_000_000_000_000.0 } ?? 0.0
+                let latencySec = event.cleanupLatency.map { Double($0.components.seconds) + Double($0.components.attoseconds) / 1_000_000_000_000_000_000.0 } ?? 0.0
+                let latencyMs = latencySec * 1000.0
+                let wordCount = event.transcriptWordCount ?? 0
+                let wps = (latencySec > 0 && wordCount > 0) ? (Double(wordCount) / latencySec) : nil
+
                 records.append(Record(
                     timestamp: now,
                     outcome: event.outcome.rawValue,
@@ -630,13 +639,19 @@ nonisolated enum DictationTelemetryLogger {
                     stage: "cleanup",
                     latencyMs: latencyMs,
                     costUsd: event.cleanupCost ?? 0.0,
-                    wordCount: event.transcriptWordCount ?? 0,
+                    wordCount: wordCount,
+                    wordsPerSecond: wps,
+                    requestId: event.cleanupRequestID,
                     usedFallback: event.usedRawCleanupFallback
                 ))
             }
 
             if let model = event.transcriptionModel, !model.isEmpty, model != "local-whisper" {
-                let latencyMs = event.transcriptionLatency.map { Double($0.components.seconds) * 1000.0 + Double($0.components.attoseconds) / 1_000_000_000_000_000.0 } ?? 0.0
+                let latencySec = event.transcriptionLatency.map { Double($0.components.seconds) + Double($0.components.attoseconds) / 1_000_000_000_000_000_000.0 } ?? 0.0
+                let latencyMs = latencySec * 1000.0
+                let wordCount = event.transcriptWordCount ?? 0
+                let wps = (latencySec > 0 && wordCount > 0) ? (Double(wordCount) / latencySec) : nil
+
                 records.append(Record(
                     timestamp: now,
                     outcome: event.outcome.rawValue,
@@ -644,7 +659,9 @@ nonisolated enum DictationTelemetryLogger {
                     stage: "transcription",
                     latencyMs: latencyMs,
                     costUsd: event.transcriptionCost ?? 0.0,
-                    wordCount: event.transcriptWordCount ?? 0,
+                    wordCount: wordCount,
+                    wordsPerSecond: wps,
+                    requestId: nil,
                     usedFallback: false
                 ))
             }
