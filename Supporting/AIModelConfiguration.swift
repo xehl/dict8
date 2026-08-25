@@ -28,7 +28,7 @@ nonisolated struct AIModelConfiguration: Equatable, Sendable {
     static let phaseZeroVerified = AIModelConfiguration(
         transcriptionModel: "openai/whisper-large-v3",
         transcriptionFallbackModel: "google/chirp-3",
-        cleanupModel: "openrouter/auto",
+        cleanupModel: "meta-llama/llama-3.1-8b-instruct:nitro",
         localTranscriptionModel: defaultLocalTranscriptionModel
     )
 

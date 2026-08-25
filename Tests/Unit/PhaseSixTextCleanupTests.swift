@@ -29,9 +29,9 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         // The deadline passed to transport is the remaining time computed
         // from a ContinuousClock at call time (to support the zero-
         // completion retry's shared budget), so it is slightly under the
-        // nominal 3.5s rather than exactly equal.
-        XCTAssertLessThanOrEqual(execution.deadline, .seconds(3.5))
-        XCTAssertGreaterThan(execution.deadline, .seconds(2.5))
+        // nominal 5.0s rather than exactly equal.
+        XCTAssertLessThanOrEqual(execution.deadline, .seconds(5.0))
+        XCTAssertGreaterThan(execution.deadline, .seconds(3.5))
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0]["role"] as? String, "system")
         XCTAssertEqual(messages[0]["content"] as? String, OpenRouterTextCleanupService.systemPrompt)

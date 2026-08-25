@@ -28,7 +28,7 @@ final class PhaseOneAppShellTests: XCTestCase {
 
         let initialState = AppState(defaults: defaults)
         XCTAssertEqual(initialState.transcriptionEngine, .local)
-        XCTAssertEqual(initialState.selectedCleanupModel, "openrouter/auto")
+        XCTAssertEqual(initialState.selectedCleanupModel, "meta-llama/llama-3.1-8b-instruct:nitro")
 
         initialState.setTranscriptionEngine(.cloud)
         initialState.setSelectedCleanupModel("meta-llama/llama-3.2-3b-instruct")

@@ -316,10 +316,10 @@ nonisolated struct CleanupOutputValidator: Sendable {
 }
 
 actor OpenRouterTextCleanupService: TextCleanupProviding {
-    /// Lowered from 10s (approved 2026-08-18): cleanup is a low-stakes
-    /// "lightly punctuate this" task, so failing fast into the raw-transcript
-    /// fallback path after 3.5 seconds eliminates noticeable UI hangs.
-    static let defaultDeadline: Duration = .seconds(3.5)
+    /// Lowered from 10s (approved 2026-08-18, updated 2026-08-25): cleanup is a low-stakes
+    /// "lightly punctuate this" task with a 5.0s safety ceiling, while Nitro models
+    /// typically finish generation within 250–500ms.
+    static let defaultDeadline: Duration = .seconds(5.0)
     static let temperature = 0.1
     /// Approved exception (AGENTS.md §4, PRD.md §8): cleanup routes through
     /// OpenRouter's Auto Router (stable slug, `openrouter/auto`) at the
