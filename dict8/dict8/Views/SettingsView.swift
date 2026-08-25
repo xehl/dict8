@@ -26,6 +26,7 @@ struct SettingsView: View {
 
             Form {
                 usageOverviewSection
+                costSection
                 modelsSection
                 #if DEBUG
                 audioRecordingTestSection
@@ -40,7 +41,6 @@ struct SettingsView: View {
 
             Form {
                 latencySection
-                costSection
                 lastIssueSection
                 recentDiagnosticsSection
             }
@@ -284,7 +284,6 @@ struct SettingsView: View {
             LabeledContent("Storage", value: appState.metricsStatus.displayName)
             LabeledContent("Dictation requests", value: metrics.requestCount.formatted())
             LabeledContent("Successful", value: metrics.successCount.formatted())
-            LabeledContent("Failed", value: metrics.failureCount.formatted())
             LabeledContent("Success rate", value: successRate(metrics.successRate))
             LabeledContent(
                 "Audio minutes",
