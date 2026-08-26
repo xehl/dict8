@@ -87,8 +87,12 @@ final class SystemPlainTextClipboard: PlainTextClipboardWriting {
     }
 
     func write(_ text: String) throws {
+        let initialChangeCount = pasteboard.changeCount
         pasteboard.clearContents()
         guard pasteboard.setString(text, forType: .string) else {
+            throw TextPasteError.clipboardWriteFailed
+        }
+        guard pasteboard.changeCount != initialChangeCount else {
             throw TextPasteError.clipboardWriteFailed
         }
     }

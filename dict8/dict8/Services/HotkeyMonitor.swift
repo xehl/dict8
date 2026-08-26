@@ -237,6 +237,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var stateMachine = HotkeyStateMachine()
+    private var watchdogTimer: Timer?
 
     func start() throws {
         guard eventTap == nil else { return }
@@ -272,9 +273,11 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
         eventTap = tap
         runLoopSource = source
         isRunning = true
+        startWatchdog()
     }
 
     func stop() {
+        stopWatchdog()
         if let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
         }
@@ -285,6 +288,27 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
         runLoopSource = nil
         stateMachine.reset()
         isRunning = false
+    }
+
+    private func startWatchdog() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.verifyEventTapHealth()
+            }
+        }
+    }
+
+    private func stopWatchdog() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = nil
+    }
+
+    private func verifyEventTapHealth() {
+        guard isRunning, let eventTap else { return }
+        if !CGEvent.tapIsEnabled(tap: eventTap) {
+            CGEvent.tapEnable(tap: eventTap, enable: true)
+        }
     }
 
     private func handle(

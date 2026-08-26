@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 
 nonisolated struct DictationPipelineTiming: Equatable, Sendable {
@@ -1621,6 +1622,25 @@ final class AppCoordinator {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.prepareForQuit()
+                }
+            }
+        )
+
+        lifecycleObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.audioRecorder.resetPrewarmed()
+                    if self.state.isEnabled && !self.state.audioTestStatus.isStartingOrRecording {
+                        self.audioRecorder.prewarm()
+                    }
+                    if let localSTT = self.localSpeechToText as? LocalSpeechToTextService {
+                        await localSTT.prewarm()
+                    }
                 }
             }
         )

@@ -110,6 +110,7 @@ protocol AudioRecording: AnyObject {
     }
 
     func prewarm()
+    func resetPrewarmed()
     func start() throws
     func stop() throws -> RecordedAudioFile
     func cancel() throws
@@ -118,6 +119,7 @@ protocol AudioRecording: AnyObject {
 
 extension AudioRecording {
     func prewarm() {}
+    func resetPrewarmed() {}
 }
 
 @MainActor
@@ -299,12 +301,16 @@ final class SystemAudioRecordingService: AudioRecording {
         }
     }
 
-    func cancel() throws {
+    func resetPrewarmed() {
         if let prewarmed = prewarmedRecorder {
             prewarmedRecorder = nil
             prewarmed.driver.stop()
             try? removeIfPresent(prewarmed.url)
         }
+    }
+
+    func cancel() throws {
+        resetPrewarmed()
         guard let activeRecording else { return }
         self.activeRecording = nil
         activeRecording.driver.onFinished = nil
