@@ -195,6 +195,7 @@ final class SystemAccessibilityService: AccessibilityInspecting {
     }
 
     private func precedingText(from element: AXUIElement) -> String? {
+        AXUIElementSetMessagingTimeout(element, 0.1)
         guard let fullText = stringAttribute(kAXValueAttribute, from: element),
               !fullText.isEmpty else {
             return nil
@@ -241,6 +242,7 @@ final class SystemAccessibilityService: AccessibilityInspecting {
     }
 
     private func focusedElement(in applicationElement: AXUIElement) -> AXUIElement? {
+        AXUIElementSetMessagingTimeout(applicationElement, 0.1)
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             applicationElement,
@@ -253,13 +255,16 @@ final class SystemAccessibilityService: AccessibilityInspecting {
             return nil
         }
 
-        return unsafeDowncast(value, to: AXUIElement.self)
+        let element = unsafeDowncast(value, to: AXUIElement.self)
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        return element
     }
 
     private func stringAttribute(
         _ attribute: String,
         from element: AXUIElement
     ) -> String? {
+        AXUIElementSetMessagingTimeout(element, 0.1)
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
         guard result == .success else { return nil }

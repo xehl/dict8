@@ -16,27 +16,16 @@ nonisolated enum HotkeyAction: Equatable, Sendable {
 nonisolated struct HotkeyDecision: Equatable, Sendable {
     let consume: Bool
     let actions: [HotkeyAction]
-    let stripPushToTalkModifiers: Bool
 
     init(
         consume: Bool,
-        actions: [HotkeyAction],
-        stripPushToTalkModifiers: Bool = false
+        actions: [HotkeyAction]
     ) {
         self.consume = consume
         self.actions = actions
-        self.stripPushToTalkModifiers = stripPushToTalkModifiers
     }
 
     static let pass = HotkeyDecision(consume: false, actions: [])
-
-    func flagsForDelivery(_ flags: CGEventFlags) -> CGEventFlags {
-        guard stripPushToTalkModifiers else { return flags }
-        var deliveredFlags = flags
-        deliveredFlags.remove(.maskControl)
-        deliveredFlags.remove(.maskAlternate)
-        return deliveredFlags
-    }
 }
 
 nonisolated struct HotkeyStateMachine: Sendable {
@@ -107,10 +96,7 @@ nonisolated struct HotkeyStateMachine: Sendable {
 
         return HotkeyDecision(
             consume: consume,
-            actions: actions,
-            stripPushToTalkModifiers: pushToTalkIsLatched
-                && !pushToTalkReleaseWasSent
-                && Self.isLeftMouseEvent(typeRawValue)
+            actions: actions
         )
     }
 
@@ -229,17 +215,6 @@ nonisolated struct HotkeyStateMachine: Sendable {
     private static func isControlOrOptionKeyCode(_ keyCode: Int64) -> Bool {
         controlKeyCodes.contains(keyCode) || optionKeyCodes.contains(keyCode)
     }
-
-    private static func isLeftMouseEvent(_ typeRawValue: UInt32) -> Bool {
-        switch typeRawValue {
-        case CGEventType.leftMouseDown.rawValue,
-             CGEventType.leftMouseUp.rawValue,
-             CGEventType.leftMouseDragged.rawValue:
-            true
-        default:
-            false
-        }
-    }
 }
 
 @MainActor
@@ -273,9 +248,6 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
             CGEventType.keyDown,
             CGEventType.keyUp,
             CGEventType.flagsChanged,
-            CGEventType.leftMouseDown,
-            CGEventType.leftMouseUp,
-            CGEventType.leftMouseDragged,
         ]
         let mask = interestedEvents.reduce(CGEventMask(0)) { partialResult, eventType in
             partialResult | CGEventMask(1 << eventType.rawValue)
@@ -373,7 +345,6 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
                 marker: marker
             )
         }
-        event.flags = decision.flagsForDelivery(event.flags)
         return decision.consume ? nil : Unmanaged.passUnretained(event)
     }
 }
