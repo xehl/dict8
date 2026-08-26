@@ -281,9 +281,7 @@ struct SettingsView: View {
     private var usageOverviewSection: some View {
         Section("Usage") {
             let metrics = appState.usageMetrics
-            LabeledContent("Storage", value: appState.metricsStatus.displayName)
             LabeledContent("Dictation requests", value: metrics.requestCount.formatted())
-            LabeledContent("Successful", value: metrics.successCount.formatted())
             LabeledContent("Success rate", value: successRate(metrics.successRate))
             LabeledContent(
                 "Audio minutes",
