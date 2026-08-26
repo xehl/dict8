@@ -169,7 +169,7 @@ final class PhaseTwoPasteTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let configuration = AppConfiguration(
             hotkeyDisplayName: "Control + Option",
-            pasteLastHotkeyDisplayName: "Command + Control + V",
+            pasteLastHotkeyDisplayName: "CMD + Control + V",
             hudPreviewDuration: .zero,
             testPasteDelay: .zero,
             testPasteText: "synthetic settings paste",

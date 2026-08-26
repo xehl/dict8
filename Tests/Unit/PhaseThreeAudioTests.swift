@@ -419,7 +419,7 @@ final class PhaseThreeAudioTests: XCTestCase {
     private func audioConfiguration(recordingLifetime: Duration) -> AppConfiguration {
         AppConfiguration(
             hotkeyDisplayName: "Control + Option",
-            pasteLastHotkeyDisplayName: "Command + Control + V",
+            pasteLastHotkeyDisplayName: "CMD + Control + V",
             hudPreviewDuration: .zero,
             testPasteDelay: .zero,
             testPasteText: "synthetic paste",

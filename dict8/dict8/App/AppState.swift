@@ -366,7 +366,7 @@ struct AppConfiguration: Equatable, Sendable {
 
     static let v0 = AppConfiguration(
         hotkeyDisplayName: "Control + Option",
-        pasteLastHotkeyDisplayName: "Command + Control + V",
+        pasteLastHotkeyDisplayName: "CMD + Control + V",
         hudPreviewDuration: .seconds(2),
         testPasteDelay: .seconds(3),
         testPasteText: "dict8 paste test",
