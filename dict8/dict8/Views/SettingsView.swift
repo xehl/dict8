@@ -22,7 +22,9 @@ struct SettingsView: View {
             .scrollDisabled(true)
             .frame(width: 330, height: columnHeight, alignment: .top)
 
-            Divider()
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1)
                 .frame(maxHeight: .infinity)
 
             Form {
@@ -38,7 +40,9 @@ struct SettingsView: View {
             .scrollDisabled(true)
             .frame(width: 375, height: columnHeight, alignment: .top)
 
-            Divider()
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1)
                 .frame(maxHeight: .infinity)
 
             Form {
@@ -714,7 +718,7 @@ private struct CostStatCell: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .frame(minWidth: 100, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var formatted: String {
