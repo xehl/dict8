@@ -335,11 +335,15 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
     }
 
     private func deliver(_ actions: [HotkeyAction]) {
-        for action in actions {
-            switch action {
-            case .pushToTalkPressed: onPushToTalkPressed?()
-            case .pushToTalkReleased: onPushToTalkReleased?()
-            case .pasteLast: onPasteLast?()
+        guard !actions.isEmpty else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            for action in actions {
+                switch action {
+                case .pushToTalkPressed: self.onPushToTalkPressed?()
+                case .pushToTalkReleased: self.onPushToTalkReleased?()
+                case .pasteLast: self.onPasteLast?()
+                }
             }
         }
     }

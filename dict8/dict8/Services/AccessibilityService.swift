@@ -179,6 +179,7 @@ final class SystemAccessibilityService: AccessibilityInspecting {
     }
 
     private func focusedWindowTitle(in applicationElement: AXUIElement) -> String? {
+        AXUIElementSetMessagingTimeout(applicationElement, 0.1)
         var windowValue: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             applicationElement,
@@ -191,6 +192,7 @@ final class SystemAccessibilityService: AccessibilityInspecting {
             return nil
         }
         let windowElement = unsafeDowncast(windowValue, to: AXUIElement.self)
+        AXUIElementSetMessagingTimeout(windowElement, 0.1)
         return stringAttribute(kAXTitleAttribute, from: windowElement)
     }
 
