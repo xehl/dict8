@@ -23,6 +23,7 @@ struct SettingsView: View {
             .frame(width: 330, height: columnHeight, alignment: .top)
 
             Divider()
+                .frame(maxHeight: .infinity)
 
             Form {
                 usageOverviewSection
@@ -38,6 +39,7 @@ struct SettingsView: View {
             .frame(width: 375, height: columnHeight, alignment: .top)
 
             Divider()
+                .frame(maxHeight: .infinity)
 
             Form {
                 latencySection
@@ -175,19 +177,13 @@ struct SettingsView: View {
                 value: appState.microphonePermissionStatus.displayName
             )
 
-            HStack {
-                Button("Request Microphone") {
-                    coordinator.requestMicrophonePermission()
-                }
-                .disabled(
-                    appState.microphonePermissionStatus == .granted
-                        || appState.microphonePermissionStatus == .restricted
-                )
-
-                Button("Microphone Settings") {
-                    coordinator.openMicrophoneSettings()
-                }
+            Button("Request Microphone Access") {
+                coordinator.requestMicrophonePermission()
             }
+            .disabled(
+                appState.microphonePermissionStatus == .granted
+                    || appState.microphonePermissionStatus == .restricted
+            )
 
             LabeledContent(
                 "Accessibility",
@@ -198,15 +194,8 @@ struct SettingsView: View {
                 value: appState.hotkeyMonitorStatus.displayName
             )
 
-            HStack {
-                Button("Request Accessibility") {
-                    coordinator.requestAccessibilityPermission()
-                }
-                .disabled(appState.accessibilityStatus == .granted)
-
-                Button("Accessibility Settings") {
-                    coordinator.openAccessibilitySettings()
-                }
+            Button("Accessibility Settings") {
+                coordinator.openAccessibilitySettings()
             }
         }
     }
@@ -354,7 +343,6 @@ struct SettingsView: View {
                     CostStatCell(caption: "cleanup", value: metrics.totalCleanupCost)
                     StatDivider()
                     CostStatCell(caption: "total", value: metrics.totalReportedCost)
-                    Spacer()
                 }
             }
             .padding(.vertical, 2)
@@ -688,8 +676,7 @@ private struct StatDivider: View {
     var body: some View {
         Rectangle()
             .fill(Color(nsColor: .separatorColor))
-            .frame(width: 1)
-            .padding(.vertical, 2)
+            .frame(width: 1, height: 28)
             .padding(.horizontal, 8)
     }
 }
