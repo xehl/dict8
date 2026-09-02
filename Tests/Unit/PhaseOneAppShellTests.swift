@@ -21,20 +21,17 @@ final class PhaseOneAppShellTests: XCTestCase {
         XCTAssertEqual(restoredState.status, .disabled)
     }
 
-    func testTranscriptionEngineAndCleanupModelPersistChanges() throws {
+    func testCleanupModelPersistChanges() throws {
         let suiteName = "PhaseOnePipelineSettingsTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let initialState = AppState(defaults: defaults)
-        XCTAssertEqual(initialState.transcriptionEngine, .local)
         XCTAssertEqual(initialState.selectedCleanupModel, "meta-llama/llama-3.1-8b-instruct:nitro")
 
-        initialState.setTranscriptionEngine(.cloud)
         initialState.setSelectedCleanupModel("meta-llama/llama-3.2-3b-instruct")
 
         let restoredState = AppState(defaults: defaults)
-        XCTAssertEqual(restoredState.transcriptionEngine, .cloud)
         XCTAssertEqual(restoredState.selectedCleanupModel, "meta-llama/llama-3.2-3b-instruct")
     }
 

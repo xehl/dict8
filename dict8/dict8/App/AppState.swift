@@ -378,21 +378,8 @@ struct AppConfiguration: Equatable, Sendable {
 @MainActor
 final class AppState: ObservableObject {
     static let enabledDefaultsKey = "dict8.isEnabled"
-    static let transcriptionEngineDefaultsKey = "dict8.transcriptionEngine"
     static let cleanupModelDefaultsKey = "dict8.cleanupModel"
     static let customVocabularyDefaultsKey = "dict8.customVocabulary"
-
-    public enum TranscriptionEngine: String, CaseIterable, Sendable {
-        case local = "local"
-        case cloud = "cloud"
-
-        public var displayName: String {
-            switch self {
-            case .local: "Local (WhisperKit ANE)"
-            case .cloud: "Cloud (OpenRouter)"
-            }
-        }
-    }
 
     @Published private(set) var status: AppStatus
     @Published private(set) var apiKeyStatus: APIKeyStatus = .checking
@@ -411,7 +398,6 @@ final class AppState: ObservableObject {
     @Published private(set) var usageMetrics = UsageMetricsSnapshot()
     @Published private(set) var metricsStatus: MetricsStoreStatus = .available
     @Published private(set) var temporaryAudioMaintenanceStatus: TemporaryAudioMaintenanceStatus = .pending
-    @Published private(set) var transcriptionEngine: TranscriptionEngine = .local
     @Published private(set) var selectedCleanupModel: String = AIModelConfiguration.phaseZeroVerified.cleanupModel
     @Published private(set) var customVocabulary: String = ""
     @Published private(set) var cleanupDiagnostics: [CleanupDiagnosticEntry] = []
@@ -438,14 +424,6 @@ final class AppState: ObservableObject {
             status = enabledPreference ? .idle : .disabled
         }
 
-        if let rawEngine = defaults.string(forKey: Self.transcriptionEngineDefaultsKey),
-           let engine = TranscriptionEngine(rawValue: rawEngine) {
-            transcriptionEngine = engine
-        } else {
-            transcriptionEngine = .local
-            defaults.set(TranscriptionEngine.local.rawValue, forKey: Self.transcriptionEngineDefaultsKey)
-        }
-
         if let savedCleanup = defaults.string(forKey: Self.cleanupModelDefaultsKey),
            AIModelConfiguration.fastCleanupCandidates.contains(savedCleanup) {
             selectedCleanupModel = savedCleanup
@@ -464,11 +442,6 @@ final class AppState: ObservableObject {
     func setCustomVocabulary(_ vocabulary: String) {
         customVocabulary = vocabulary
         defaults.set(vocabulary, forKey: Self.customVocabularyDefaultsKey)
-    }
-
-    func setTranscriptionEngine(_ engine: TranscriptionEngine) {
-        transcriptionEngine = engine
-        defaults.set(engine.rawValue, forKey: Self.transcriptionEngineDefaultsKey)
     }
 
     func setSelectedCleanupModel(_ model: String) {
