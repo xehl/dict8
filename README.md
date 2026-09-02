@@ -6,6 +6,13 @@ dict8 is a native macOS push-to-talk dictation utility. Hold `Control + Option`,
 
 The personal v0 is in routine use on Apple silicon with macOS 26. It supports short and long-form dictation, a three-minute recording limit, target-safe paste, a ten-minute memory-only Paste Last cache, and content-free aggregate usage metrics.
 
+### Recent Updates (2026-09-02)
+- **Repeatable packaging**: `Scripts/build-release.sh` builds a Release copy and installs it to `/Applications` in one step, replacing the manual Archive flow for daily updates.
+- **Local-first STT**: On-device WhisperKit (`distil-whisper/distil-large-v3`) on Apple Neural Engine is the only production transcription engine, pinned in code; cloud STT exists solely as a transparent fallback when local initialization fails. There is no engine setting.
+- **Deterministic ad-hoc signing**: The project now uses manual ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so the code-directory hash stays stable across rebuilds and TCC permission grants survive recompiles. Hardened Runtime is disabled in the local configuration.
+- **Cleanup observability**: An ephemeral in-memory diagnostics ring (up to 20 entries, 10-minute lifetime) records cleanup validation ratios for model benchmarking; it is never persisted, logged, or synced.
+- **Cleanup context awareness**: User-configured custom vocabulary and the originating application (code editors and terminals preserve identifier casing and syntax) are incorporated into the cleanup prompt and validator.
+
 ### Recent Updates (2026-08-13)
 - **Cleanup Routing & Auto Router Stabilization**: Reverted cleanup model routing from the experimental Beta track (`openrouter/auto-beta`) back to the stable Auto Router slug (`openrouter/auto`) due to excessive zero-completion fallbacks on Beta.
 - **Explicit Reasoning Control**: Added `"reasoning": {"effort": "none"}` to cleanup chat completion payloads, preventing reasoning models selected by Auto Router from exhausting generation token limits on chain-of-thought tokens.
@@ -59,7 +66,7 @@ Review [Privacy and logging](docs/PRIVACY_AND_LOGGING.md) and OpenRouter's [Zero
 
 ## Architecture
 
-dict8 uses Swift, SwiftUI, AppKit, AVFoundation, Keychain Services, ServiceManagement, `NSPasteboard`, `CGEvent`, `URLSession`, and Swift concurrency. It has no third-party application dependencies.
+dict8 uses Swift, SwiftUI, AppKit, AVFoundation, Keychain Services, ServiceManagement, `NSPasteboard`, `CGEvent`, `URLSession`, and Swift concurrency. WhisperKit is the single third-party dependency and powers local on-device STT; cloud STT and cleanup are OpenRouter-only.
 
 ```text
 dict8/

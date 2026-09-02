@@ -9,9 +9,10 @@ You need:
 - An Apple silicon Mac running macOS 26 or newer
 - Xcode with the macOS 26 SDK
 - Git
-- An Apple Account available in Xcode for local signing
 - An OpenRouter account and API key
 - Authority to grant Microphone and Accessibility access
+
+No Apple Account or signing team is required: the checked-in project is configured for ad-hoc local signing.
 
 On a company-managed Mac, confirm that policy permits locally built applications, microphone recording, Accessibility control, global keyboard monitoring, Keychain access, and Launch at Login. Mobile-device-management policy can prevent one or more of these capabilities even when the build succeeds.
 
@@ -40,19 +41,13 @@ open dict8/dict8.xcodeproj
 
 In Xcode:
 
-1. Open **Xcode → Settings → Accounts**.
-2. Add the Apple Account used for local development if it is not already present.
-3. Select the blue **dict8** project in the Project navigator.
-4. Select the **dict8** application target, then **Signing & Capabilities**.
-5. Enable **Automatically manage signing** and select your team.
-6. If Xcode reports that `com.xehl.dict8` is unavailable to your team, change the bundle identifier to a unique reverse-DNS value such as `com.yourname.dict8`.
-7. Select the **dict8Tests** target and apply the same signing team. Give its bundle identifier a matching unique prefix if Xcode requires it.
+1. Open **Xcode → Settings → Accounts** (optional; only needed if you intentionally switch to team signing).
+2. Select the blue **dict8** project in the Project navigator.
+3. Select the **dict8** application target, then **Signing & Capabilities**, and confirm signing shows **Sign to Run Locally** with **Automatically manage signing** unchecked. This matches the checked-in project configuration.
 
-The checked-in project keeps the maintainer's signing team and bundle identifiers so installed development builds retain a stable macOS identity. Selecting your own team or identifiers may create a local `project.pbxproj` change. That is expected for a source installation; do not commit that machine-specific signing change unless you intentionally maintain a fork with its own identity.
+The checked-in project uses manual ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`, `CODE_SIGN_STYLE = Manual`). Ad-hoc signing produces a deterministic code-directory hash for a given build, so macOS treats rebuilds as the same application and permission grants survive recompiles. Keep the bundle identifier `com.xehl.dict8` stable.
 
-Keep **Hardened Runtime** enabled and **App Sandbox** disabled. dict8 requires an active Accessibility event tap and focused-element inspection; the current implementation did not receive the required authorization while sandboxed. The application target must retain its Audio Input entitlement.
-
-Changing the bundle identifier or signing identity makes macOS treat the build as a different application for permissions. Keep both stable after the first successful installation.
+Keep **App Sandbox** disabled. dict8 requires an active Accessibility event tap and focused-element inspection; the current implementation did not receive the required authorization while sandboxed. The application target must retain its Audio Input entitlement. Hardened Runtime is disabled in the local configuration because ad-hoc signing cannot use it; this is acceptable for a locally built personal tool and is not suitable for notarized distribution.
 
 ## 4. Build and test
 
@@ -65,7 +60,13 @@ The automated suite uses synthetic data and test doubles. It does not make live 
 
 ## 5. Create the installed app
 
-Use a Release archive so the installed copy has a stable path and identity:
+The repeatable path is the packaging script, which builds Release and installs in one step:
+
+```zsh
+./Scripts/build-release.sh
+```
+
+The manual Archive flow is equivalent if you prefer Xcode:
 
 1. Quit every running copy of dict8.
 2. In Xcode, select the `dict8` scheme and **My Mac**.
@@ -105,9 +106,9 @@ The API key and permission grants do not migrate from another Mac. Configure the
 
 1. Pull the desired commit and review the changes.
 2. Run the complete unit-test suite.
-3. Create a new Release archive.
+3. Run `./Scripts/build-release.sh` (or create a new Release archive).
 4. Quit dict8.
-5. Replace `/Applications/dict8.app` with the newly archived app.
+5. Replace `/Applications/dict8.app` with the newly archived app (the script does this).
 6. Launch the installed copy and confirm Accessibility, Microphone, Keychain, dictation, and Launch at Login still work.
 
 Preserving the bundle identifier and signing identity gives macOS the best chance of retaining permission and Keychain continuity. If permissions no longer attach to the replacement, remove stale dict8 entries from the relevant Privacy & Security pane, add the installed app again, and relaunch it.

@@ -12,9 +12,11 @@ On 2026-07-10, the Phase 0 tap passed press/release and target-capture checks in
 
 ## ADR-002 — macOS deployment and signing
 
-**Status:** Accepted for personal v0 development
+**Status:** Updated 2026-08-26 for deterministic ad-hoc local signing
 
-v0 is developed and tested on macOS 26.5 for Apple silicon with a macOS 26.0 deployment target. The bundle identifier is `com.xehl.dict8`. Use Xcode automatic signing with Personal Team `94685W8N78` and Hardened Runtime. App Sandbox must remain disabled: in the observed Phase 0 test, sandboxing prevented dict8 from appearing in Accessibility settings and the event tap could not run; removing it allowed authorization and the probe to work. Developer ID distribution, notarization, and Mac App Store distribution remain out of scope.
+v0 is developed and tested on macOS 26.5 for Apple silicon with a macOS 26.0 deployment target. The bundle identifier is `com.xehl.dict8`. The checked-in project uses manual ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`, `CODE_SIGN_STYLE = Manual`, Hardened Runtime disabled), replacing the original automatic signing with Personal Team `94685W8N78`. App Sandbox must remain disabled: in the observed Phase 0 test, sandboxing prevented dict8 from appearing in Accessibility settings and the event tap could not run; removing it allowed authorization and the probe to work.
+
+Ad-hoc signing was adopted in the Phase 7 hardening work so a rebuild produces the same code-directory hash for the same sources; with automatic team signing, every recompile produced a new CDHash and silently invalidated Microphone and Accessibility grants (the stale-permission failure mode where System Settings shows the toggle ON but the tap cannot be created). When replacing the installed bundle, macOS may still require a one-time re-grant; `tccutil reset Accessibility com.xehl.dict8` (and the Microphone equivalent) clears stale entries. Developer ID distribution, notarization, and Mac App Store distribution remain out of scope.
 
 ## ADR-003 — OpenRouter contracts and pinned models
 
@@ -121,3 +123,23 @@ Persist one versioned, typed `UserDefaults` snapshot containing only counts, dur
 At launch, inspect only the shallow app-owned `dict8-recordings` temporary directory. Delete regular `.m4a` files whose modification time is more than 15 minutes old, retrying a failed deletion once. Do not traverse subdirectories or delete other extensions. This sweep limits abnormal-exit residue without treating the temporary directory as general application storage.
 
 The local v0 candidate is marketing version `0.1.0`, build `1`. Personal Team signing, App Sandbox disabled, and Hardened Runtime remain unchanged. Notarization, releases, tags, and a single-instance lock are out of scope; do not run an Xcode build and an installed `/Applications` copy simultaneously.
+
+## ADR-018 — Hybrid local WhisperKit STT with cloud fallback
+
+**Status:** Implemented (approved 2026-08-15); engine Settings control pending
+
+Local on-device speech-to-text via `WhisperKit` (`distil-whisper/distil-large-v3`) on Apple Silicon ANE is the primary production engine, paired with `OpenRouterSpeechToTextService` as a transparent fallback when local hardware initialization fails. `LocalSpeechToTextService` conforms to `SpeechToTextProviding`, so the coordinator consumes one interface regardless of engine. The model is cached under `Application Support/dict8/models` and prewarmed at launch to remove first-dictation cost. Rationale: $0 egress, audio never leaves the device for STT, and roughly 100–150 ms transcription latency, which drives end-to-end latency toward the sub-500 ms target with a fast cloud cleanup model.
+
+Transcription is pinned to local STT in code; there is no user-facing engine setting. A transient `dict8.transcriptionEngine` selection used during benchmarking was removed on 2026-09-02 when the coordinator's local-first selection made it redundant. Cloud STT is not user-selectable and remains subject to the required account-level OpenAI/Google ZDR settings when the fallback engages.
+
+## ADR-019 — Ephemeral cleanup failure diagnostics
+
+**Status:** Implemented (approved 2026-08-18)
+
+To calibrate cleanup validation rules (false-positive novel-content and expansion rejections across candidate cleanup models), the app keeps an in-memory ring buffer of up to 20 entries with a 600-second lifetime, mirroring the `LastDictationCache` lifecycle: auto-cleared on screen lock, sleep, Quit, or manual clear. Entries contain the raw input, candidate output, candidate model slug, and computed validation ratios. The buffer is process-memory only: never written to disk or logs, never synchronized, and exists solely for model benchmarking and validator calibration.
+
+## ADR-020 — Cleanup custom vocabulary and target application context
+
+**Status:** Implemented (approved 2026-08-18)
+
+The cleanup stage incorporates user-configured custom vocabulary (stored in `UserDefaults` as `dict8.customVocabulary`) and the originating application name (`PasteTarget`) into the cleanup prompt and validator. Vocabulary terms are treated as expected words during output validation so proper nouns and technical names are not flagged as novel content. Targets identified as code editors or terminals add instructions to preserve camelCase, snake_case, variable names, and code syntax. The cleanup model remains OpenRouter Auto Router (`openrouter/auto`) per the approved exception, with `dict8.cleanupModel` as a benchmarking override.
