@@ -92,6 +92,8 @@ Open dict8 from the menu bar, choose **Settings**, and complete these steps:
 
 The API key and permission grants do not migrate from another Mac. Configure them independently on every installation.
 
+The first local dictation downloads the WhisperKit model (roughly 1.4 GB) into `Application Support/dict8/models` and can take a minute; after that, transcription runs entirely on-device.
+
 ## 7. Verify the installation
 
 1. Open TextEdit and create a blank document.

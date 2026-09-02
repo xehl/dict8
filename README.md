@@ -24,10 +24,11 @@ dict8 is currently distributed as source under the [MIT License](LICENSE). There
 ## Requirements
 
 - Apple silicon Mac running macOS 26 or newer
-- Xcode with the macOS 26 SDK
-- An Apple Account or development team for local code signing
+- Xcode with the macOS 26 SDK (the toolchain; daily updates never require opening the IDE)
 - An [OpenRouter](https://openrouter.ai/) account and API key
 - Permission to grant Microphone and Accessibility access on the Mac
+
+No Apple Account or signing team is required; the project is configured for ad-hoc local signing.
 
 Company-managed Macs may restrict locally signed software, microphone access, Accessibility access, global event taps, or Launch at Login.
 
@@ -37,11 +38,12 @@ See [Installing dict8 from source](docs/INSTALL.md) for the complete signing, bu
 
 At a high level:
 
-1. Clone the repository and open `dict8/dict8.xcodeproj`.
-2. Select your signing team and, if necessary, choose a unique bundle identifier.
-3. Build and test the `dict8` scheme for **My Mac**.
-4. Archive the Release build and copy `dict8.app` to `/Applications`.
-5. Launch the installed copy, enter an OpenRouter API key, and grant Microphone and Accessibility access.
+1. Clone the repository.
+2. Run the unit-test suite with the `dict8` scheme for **My Mac** (`Command + U`, or `xcodebuild test`).
+3. Run `./Scripts/build-release.sh` to build Release and install `/Applications/dict8.app`.
+4. Launch the installed copy, enter an OpenRouter API key, and grant Microphone and Accessibility access.
+
+The first local dictation downloads the WhisperKit model (roughly 1.4 GB) into `Application Support/dict8/models` and can take a minute; after that, transcription runs entirely on-device.
 
 ## Use
 
