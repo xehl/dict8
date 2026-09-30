@@ -189,6 +189,38 @@ final class PhaseEightPipelineTests: XCTestCase {
         }
     }
 
+    func testScreenLockAndUnlockNotificationsManageHotkeyMonitorAndCache() async {
+        let harness = PipelineHarness(transcriptionDelay: .seconds(60))
+        harness.coordinator.startIfNeeded()
+        XCTAssertTrue(harness.monitor.isRunning)
+
+        harness.monitor.onPushToTalkPressed?()
+        await waitUntil { harness.recorder.isRecording }
+        harness.monitor.onPushToTalkReleased?()
+        await waitUntil { harness.state.status == .transcribing }
+        harness.cache.store("synthetic cached result")
+
+        DistributedNotificationCenter.default().post(
+            name: NSNotification.Name("com.apple.screenIsLocked"),
+            object: nil
+        )
+        await waitUntil { harness.recorder.deleteCount == 1 }
+
+        XCTAssertTrue(harness.paste.texts.isEmpty)
+        XCTAssertNil(harness.cache.value())
+        XCTAssertFalse(harness.monitor.isRunning)
+        XCTAssertEqual(harness.state.hotkeyMonitorStatus, .stopped)
+        XCTAssertEqual(harness.metrics.snapshot.cancellationCount, 1)
+
+        DistributedNotificationCenter.default().post(
+            name: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil
+        )
+        await waitUntil { harness.monitor.isRunning }
+        XCTAssertTrue(harness.monitor.isRunning)
+        XCTAssertEqual(harness.state.hotkeyMonitorStatus, .running)
+    }
+
     func testPrepareForQuitCancelsPipelineDeletesAudioAndClearsCache() async {
         let harness = PipelineHarness(transcriptionDelay: .seconds(60))
 

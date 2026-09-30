@@ -41,7 +41,9 @@ final class SystemWhisperEngine: LocalWhisperTranscribing, @unchecked Sendable {
         )
 
         let pipe = try await WhisperKit(
+            downloadBase: modelsFolder,
             modelFolder: modelFolderURL.path,
+            tokenizerFolder: modelFolderURL,
             verbose: false,
             logLevel: .error
         )

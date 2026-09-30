@@ -327,9 +327,12 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
         return decision
     }
 
-    private func handleInterruption() {
+    private func handleInterruption(type: CGEventType) {
         deliver(stateMachine.interrupt())
-        if let eventTap {
+        // Only attempt automatic re-enable if macOS timed out the tap.
+        // If disabled by user input (e.g. security agent, lock screen, fast user switching),
+        // we must never forcefully re-enable against the OS.
+        if type == .tapDisabledByTimeout, let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: true)
         }
     }
@@ -357,7 +360,7 @@ final class SystemHotkeyMonitor: HotkeyMonitoring {
 
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             MainActor.assumeIsolated {
-                monitor.handleInterruption()
+                monitor.handleInterruption(type: type)
             }
             return Unmanaged.passUnretained(event)
         }

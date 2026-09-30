@@ -1590,25 +1590,64 @@ final class AppCoordinator {
 
     private func installLifecycleObservers() {
         let workspaceCenter = NSWorkspace.shared.notificationCenter
-        let workspaceNotifications = [
+        let suspendNotifications = [
             NSWorkspace.sessionDidResignActiveNotification,
             NSWorkspace.screensDidSleepNotification,
             NSWorkspace.willSleepNotification,
         ]
-        lifecycleObservers += workspaceNotifications.map { notificationName in
+        lifecycleObservers += suspendNotifications.map { notificationName in
             workspaceCenter.addObserver(
                 forName: notificationName,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    self?.cancelProductionPipeline()
-                    self?.cancelAudioTest()
-                    self?.cancelCleanupTest(clearInput: true)
-                    self?.lastDictationCache.clear()
+                    self?.handleSystemSuspendOrLock()
                 }
             }
         }
+
+        let resumeNotifications = [
+            NSWorkspace.screensDidWakeNotification,
+            NSWorkspace.didWakeNotification,
+            NSWorkspace.sessionDidBecomeActiveNotification,
+        ]
+        lifecycleObservers += resumeNotifications.map { notificationName in
+            workspaceCenter.addObserver(
+                forName: notificationName,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSystemWakeOrUnlock()
+                }
+            }
+        }
+
+        let distributedCenter = DistributedNotificationCenter.default()
+        lifecycleObservers.append(
+            distributedCenter.addObserver(
+                forName: NSNotification.Name("com.apple.screenIsLocked"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSystemSuspendOrLock()
+                }
+            }
+        )
+
+        lifecycleObservers.append(
+            distributedCenter.addObserver(
+                forName: NSNotification.Name("com.apple.screenIsUnlocked"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSystemWakeOrUnlock()
+                }
+            }
+        )
 
         lifecycleObservers.append(
             NotificationCenter.default.addObserver(
@@ -1640,6 +1679,20 @@ final class AppCoordinator {
                 }
             }
         )
+    }
+
+    private func handleSystemSuspendOrLock() {
+        cancelProductionPipeline()
+        cancelAudioTest()
+        cancelCleanupTest(clearInput: true)
+        lastDictationCache.clear()
+        cleanupDiagnosticStore.clear()
+        hotkeyMonitor.stop()
+        state.setHotkeyMonitorStatus(.stopped)
+    }
+
+    private func handleSystemWakeOrUnlock() {
+        updateHotkeyMonitor(for: state.accessibilityStatus)
     }
 
     private func updateHotkeyMonitor(for permissionStatus: AccessibilityPermissionStatus) {

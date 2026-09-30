@@ -96,7 +96,8 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
         capacity: Int = CleanupDiagnosticStore.defaultCapacity,
         lifetime: TimeInterval = CleanupDiagnosticStore.defaultLifetime,
         notificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
-        privacyNotifications: [Notification.Name] = LastDictationCache.v0PrivacyNotifications
+        privacyNotifications: [Notification.Name] = LastDictationCache.v0PrivacyNotifications,
+        distributedNotificationCenter: DistributedNotificationCenter? = .default()
     ) {
         self.capacity = max(1, capacity)
         self.lifetime = max(1, lifetime)
@@ -110,6 +111,20 @@ final class CleanupDiagnosticStore: CleanupDiagnosticLogging {
                     self?.clear()
                 }
             }
+        }
+
+        if let distributedNotificationCenter {
+            privacyObservers.append(
+                distributedNotificationCenter.addObserver(
+                    forName: NSNotification.Name("com.apple.screenIsLocked"),
+                    object: nil,
+                    queue: .main
+                ) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        self?.clear()
+                    }
+                }
+            )
         }
     }
 

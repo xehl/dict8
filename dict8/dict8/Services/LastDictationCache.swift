@@ -33,7 +33,8 @@ final class LastDictationCache: LastDictationCaching {
         lifetime: TimeInterval = LastDictationCache.v0Lifetime,
         now: @escaping () -> Date = Date.init,
         notificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
-        privacyNotifications: [Notification.Name] = LastDictationCache.v0PrivacyNotifications
+        privacyNotifications: [Notification.Name] = LastDictationCache.v0PrivacyNotifications,
+        distributedNotificationCenter: DistributedNotificationCenter? = .default()
     ) {
         self.lifetime = lifetime
         self.now = now
@@ -49,6 +50,20 @@ final class LastDictationCache: LastDictationCaching {
                     self?.clear()
                 }
             }
+        }
+
+        if let distributedNotificationCenter {
+            privacyObservers.append(
+                distributedNotificationCenter.addObserver(
+                    forName: NSNotification.Name("com.apple.screenIsLocked"),
+                    object: nil,
+                    queue: .main
+                ) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        self?.clear()
+                    }
+                }
+            )
         }
     }
 
