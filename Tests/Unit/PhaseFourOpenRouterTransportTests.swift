@@ -559,12 +559,12 @@ private actor StubOpenRouterTransport: OpenRouterURLTransporting {
     func requests() -> [URLRequest] { capturedRequests }
 }
 
-private actor RecordingSleeper: OpenRouterSleeping {
+private final class RecordingSleeper: OpenRouterSleeping, @unchecked Sendable {
     private var recordedDurations: [Duration] = []
 
-    func sleep(for duration: Duration) {
+    func sleep(for duration: Duration) async throws {
         recordedDurations.append(duration)
     }
 
-    func durations() -> [Duration] { recordedDurations }
+    func durations() async -> [Duration] { recordedDurations }
 }

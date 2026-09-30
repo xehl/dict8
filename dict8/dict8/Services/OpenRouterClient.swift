@@ -109,7 +109,7 @@ struct OpenRouterTransportResponse: @unchecked Sendable {
     let response: HTTPURLResponse
 }
 
-protocol OpenRouterURLTransporting: Sendable {
+nonisolated protocol OpenRouterURLTransporting: Sendable {
     func data(for request: URLRequest) async throws -> OpenRouterTransportResponse
 }
 
@@ -129,7 +129,7 @@ final class SystemOpenRouterURLTransport: OpenRouterURLTransporting, @unchecked 
     }
 }
 
-protocol OpenRouterSleeping: Sendable {
+nonisolated protocol OpenRouterSleeping: Sendable {
     func sleep(for duration: Duration) async throws
 }
 
@@ -139,7 +139,7 @@ struct TaskOpenRouterSleeper: OpenRouterSleeping {
     }
 }
 
-protocol OpenRouterTransporting: Sendable {
+nonisolated protocol OpenRouterTransporting: Sendable {
     func execute(
         _ request: OpenRouterRequest,
         models: AIModelPair,
@@ -547,7 +547,7 @@ private struct AttemptFailure: Error, Sendable {
     let retryAfter: Duration?
 }
 
-private struct ErrorEnvelope: Decodable {
+nonisolated private struct ErrorEnvelope: Decodable {
     struct Body: Decodable {
         struct Metadata: Decodable {
             let errorType: String?

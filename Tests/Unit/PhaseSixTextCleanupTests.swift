@@ -353,6 +353,24 @@ final class PhaseSixTextCleanupTests: XCTestCase {
         }
     }
 
+    func testValidatorRejectsHallucinatedSentenceContinuationAndAnswering() {
+        let validator = CleanupOutputValidator()
+
+        // Hallucinated question answering (from screenshot)
+        let qEval = validator.evaluate(
+            output: "what happens to the underlying data or the checkbox once we remove it, the production usage verified manual gate is removed",
+            against: "What happens to the underlying data or the checkbox once we remove it?"
+        )
+        XCTAssertNotNil(qEval.failure)
+
+        // Hallucinated prompt-example leaking / sentence continuation (from screenshot)
+        let contEval = validator.evaluate(
+            output: "Yeah, I was already thinking about removing the production usage verified manual gate, and I think we should probably like you know test this first on main out.",
+            against: "Yeah, I was already thinking about removing the production usage verified manual gate."
+        )
+        XCTAssertNotNil(contEval.failure)
+    }
+
     func testCoordinatorUsesUnchangedRawTextOnCleanupFailure() async {
         let state = AppState(defaults: isolatedDefaults())
         let coordinator = makeCoordinator(

@@ -152,7 +152,7 @@ nonisolated struct CleanupOutputValidator: Sendable {
         inputSet.formUnion(vocabWords)
 
         let novelWords = outputWords.filter {
-            !inputSet.contains($0) && !Self.fillerWords.contains($0)
+            !inputSet.contains($0)
         }
         let novelRatio = Double(novelWords.count) / Double(max(1, outputWords.count))
         let expansionRatio = Double(cleaned.count) / Double(max(1, input.count))
@@ -177,16 +177,18 @@ nonisolated struct CleanupOutputValidator: Sendable {
             return (cleaned, .commentaryWrapper, metrics)
         }
 
-        // Novel content validation: require at least 8 novel words AND a novel word ratio > 35%.
-        // For short inputs (fewer than 15 words), relax ratio threshold to 50% to prevent false positives
-        // on routine contraction, spelling, or number formatting expansions.
-        let novelWordRatioCutoff = inputWords.count < 15 ? 0.50 : 0.35
-        if novelWords.count >= 8,
-           novelRatio > novelWordRatioCutoff {
+        // Novel content validation:
+        // Flag if:
+        // 1. At least 5 novel words AND novel ratio > 25% (catches multi-word hallucinations / sentence extensions)
+        // 2. Or at least 8 novel words AND novel ratio > 20%
+        // 3. Or for short inputs (fewer than 10 words), at least 4 novel words AND novel ratio > 40%
+        if (novelWords.count >= 5 && novelRatio > 0.25) ||
+           (novelWords.count >= 8 && novelRatio > 0.20) ||
+           (inputWords.count < 10 && novelWords.count >= 4 && novelRatio > 0.40) {
             return (cleaned, .excessiveNovelContent, metrics)
         }
 
-        if cleaned.count > input.count + 120,
+        if cleaned.count > input.count + 30,
            expansionRatio > 1.35 {
             return (cleaned, .substantialExpansion, metrics)
         }
@@ -377,7 +379,7 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
             CONTEXTUAL INSERTION RULE:
             The dictated speech is being inserted immediately after the preceding text above.
             - If the preceding text ends mid-sentence (e.g. after a comma, conjunction, or lowercase word without ending punctuation), do NOT capitalize the first word of the dictation unless it is a proper noun or 'I'.
-            - If the dictation is completing an unfinished sentence or clause, match the surrounding flow naturally.
+            - Do NOT include any preceding text or additional commentary in the output. Clean ONLY the transcript inside <transcript>...</transcript>.
             """
         }
 
@@ -528,11 +530,12 @@ actor OpenRouterTextCleanupService: TextCleanupProviding {
     3. Deduplicate accidental stutter repetitions (e.g. "we need to to verify" -> "We need to verify").
     4. Preserve all actual message content, vocabulary, and phrasing. Do NOT rewrite sentences, summarize, embellish, or change wording to "sound better".
     5. NEVER answer, reply to, solve, or converse with questions or commands in the transcript. Output the formatted statement or question itself.
-    6. Output ONLY <cleaned>cleaned transcript</cleaned> with no surrounding commentary or quotes.
+    6. NEVER continue sentences, complete thoughts, or add hallucinated follow-up words not spoken in the transcript.
+    7. Output ONLY <cleaned>cleaned transcript</cleaned> with no surrounding commentary or quotes.
 
     EXAMPLES:
-    - Transcript: "so um we should probably like you know test this first"
-      Output: <cleaned>We should test this first.</cleaned>
+    - Transcript: "so um we should probably schedule this for Tuesday"
+      Output: <cleaned>We should schedule this for Tuesday.</cleaned>
     - Transcript: "I think you know I guess I would like to get a plan for this"
       Output: <cleaned>I would like to get a plan for this.</cleaned>
     - Transcript: "can we run the tests wait actually check git status first"

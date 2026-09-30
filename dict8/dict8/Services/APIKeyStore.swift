@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-protocol APIKeyStoring: Sendable {
+nonisolated protocol APIKeyStoring: Sendable {
     func status() async throws -> APIKeyStatus
     func apiKey() async throws -> String
     func save(_ key: String) async throws
