@@ -1,0 +1,87 @@
+name: Generate Release Notes
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes:
+    # Do not grant the workflow access to fork PRs.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FEDERATION_POLICY_ID: ${{ vars.OPENROUTER_FEDERATION_POLICY_ID }}
+        run: |
+          set -euo pipefail
+
+          IDP_JWT=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://openrouter.ai" \
+            | jq -er '.value')
+
+          TOKEN_RESPONSE=$(curl --silent --show-error \
+            --write-out '\n%{http_code}' \
+            --request POST \
+            --url "https://openrouter.ai/api/v1/oauth/token" \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+            --data-urlencode "subject_token=$IDP_JWT" \
+            --data-urlencode "federation_policy_id=$FEDERATION_POLICY_ID")
+
+          TOKEN_STATUS=$(printf '%s\n' "$TOKEN_RESPONSE" | tail -n1)
+          TOKEN_BODY=$(printf '%s\n' "$TOKEN_RESPONSE" | sed '$d')
+          if [[ "$TOKEN_STATUS" != 2* ]]; then
+            echo "OpenRouter token exchange failed (HTTP $TOKEN_STATUS): $TOKEN_BODY"
+            exit 1
+          fi
+
+          OPENROUTER_TOKEN=$(printf '%s' "$TOKEN_BODY" | jq -er '.access_token')
+
+          DIFF=$(git diff \
+            "origin/${{ github.event.pull_request.base.ref }}...HEAD" \
+            | head -c 20000)
+
+          RESPONSE=$(curl --fail --silent --show-error --max-time 90 \
+            "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $OPENROUTER_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg diff "$DIFF" \
+              '{
+                model: "openai/gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content: "Summarize this code diff into 3 concise release-note bullets. Return only the bullets."
+                  },
+                  {
+                    role: "user",
+                    content: $diff
+                  }
+                ],
+                max_tokens: 256
+              }')" \
+            | jq -er '.choices[0].message.content')
+
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body "### Generated release notes\n\n$RESPONSE"
