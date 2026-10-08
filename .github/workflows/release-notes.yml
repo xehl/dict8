@@ -20,13 +20,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Set up OpenRouter
-        id: openrouter
-        uses: OpenRouterTeam/setup-openrouter@bd2cffd5148e206572166d26c20bc5bb02dff684
-        with:
-          federation-policy-id: ${{ vars.OPENROUTER_FEDERATION_POLICY_ID }}
-          export-env: true
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -36,16 +29,32 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          FEDERATION_POLICY_ID: ${{ vars.OPENROUTER_FEDERATION_POLICY_ID }}
         run: |
           set -euo pipefail
+
+          IDP_JWT=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://openrouter.ai" \
+            | jq -er '.value')
+
+          OPENROUTER_TOKEN=$(curl --fail --silent --show-error \
+            --request POST \
+            --url "https://openrouter.ai/api/v1/oauth/token" \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+            --data-urlencode "subject_token=$IDP_JWT" \
+            --data-urlencode "federation_policy_id=$FEDERATION_POLICY_ID" \
+            | jq -er '.access_token')
 
           DIFF=$(git diff \
             "origin/${{ github.event.pull_request.base.ref }}...HEAD" \
             | head -c 20000)
 
           RESPONSE=$(curl --fail --silent --show-error --max-time 90 \
-            "$OPENAI_BASE_URL/chat/completions" \
-            -H "Authorization: Bearer ***" \
+            "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $OPENROUTER_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg diff "$DIFF" \
