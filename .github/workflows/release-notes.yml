@@ -38,6 +38,12 @@ jobs:
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://openrouter.ai" \
             | jq -er '.value')
 
+          JWT_PAYLOAD=$(printf '%s' "$IDP_JWT" \
+            | cut -d. -f2 \
+            | tr '_-' '/+' \
+            | base64 --decode 2>/dev/null || true)
+          echo "GitHub OIDC claims: $(printf '%s' "$JWT_PAYLOAD" | jq -c '{iss,sub,aud,repository,ref,event_name}')"
+
           TOKEN_RESPONSE=$(curl --silent --show-error \
             --write-out '\n%{http_code}' \
             --request POST \
