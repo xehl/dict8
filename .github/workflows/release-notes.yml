@@ -38,15 +38,24 @@ jobs:
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://openrouter.ai" \
             | jq -er '.value')
 
-          OPENROUTER_TOKEN=$(curl --fail --silent --show-error \
+          TOKEN_RESPONSE=$(curl --silent --show-error \
+            --write-out '\n%{http_code}' \
             --request POST \
             --url "https://openrouter.ai/api/v1/oauth/token" \
             --header "Content-Type: application/x-www-form-urlencoded" \
             --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
             --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
             --data-urlencode "subject_token=$IDP_JWT" \
-            --data-urlencode "federation_policy_id=$FEDERATION_POLICY_ID" \
-            | jq -er '.access_token')
+            --data-urlencode "federation_policy_id=$FEDERATION_POLICY_ID")
+
+          TOKEN_STATUS=$(printf '%s\n' "$TOKEN_RESPONSE" | tail -n1)
+          TOKEN_BODY=$(printf '%s\n' "$TOKEN_RESPONSE" | sed '$d')
+          if [[ "$TOKEN_STATUS" != 2* ]]; then
+            echo "OpenRouter token exchange failed (HTTP $TOKEN_STATUS): $TOKEN_BODY"
+            exit 1
+          fi
+
+          OPENROUTER_TOKEN=$(printf '%s' "$TOKEN_BODY" | jq -er '.access_token')
 
           DIFF=$(git diff \
             "origin/${{ github.event.pull_request.base.ref }}...HEAD" \
