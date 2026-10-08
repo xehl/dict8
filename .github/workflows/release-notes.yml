@@ -1,0 +1,69 @@
+name: Generate Release Notes
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes:
+    # Do not grant the workflow access to fork PRs.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Set up OpenRouter
+        id: openrouter
+        uses: OpenRouterTeam/setup-openrouter@bd2cffd5148e206572166d26c20bc5bb02dff684
+        with:
+          federation-policy-id: ${{ vars.OPENROUTER_FEDERATION_POLICY_ID }}
+          export-env: true
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          DIFF=$(git diff \
+            "origin/${{ github.event.pull_request.base.ref }}...HEAD" \
+            | head -c 20000)
+
+          RESPONSE=$(curl --fail --silent --show-error --max-time 90 \
+            "$OPENAI_BASE_URL/chat/completions" \
+            -H "Authorization: Bearer ***" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg diff "$DIFF" \
+              '{
+                model: "openai/gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content: "Summarize this code diff into 3 concise release-note bullets. Return only the bullets."
+                  },
+                  {
+                    role: "user",
+                    content: $diff
+                  }
+                ],
+                max_tokens: 256
+              }')" \
+            | jq -er '.choices[0].message.content')
+
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body "### Generated release notes\n\n$RESPONSE"
